@@ -71,15 +71,25 @@ class SimulatedAnnealing:
         payload_check = \
                    (self.sol.params[0] > payload_x and self.sol.params[1] > payload_y and self.sol.params[2] > payload_z) \
                 or (self.sol.params[0] > payload_x and self.sol.params[2] > payload_y and self.sol.params[1] > payload_z) \
-                or (self.sol.params[1] > payload_x and self.sol.params[0] > payload_y and self.sol.params[2] > payload_z) \ 
-                or (self.sol.params[1] > payload_x and self.sol.params[2] > payload_y and self.sol.params[0] > payload_z) \ 
-                or (self.sol.params[2] > payload_x and self.sol.params[0] > payload_y and self.sol.params[1] > payload_z) \ 
-                or (self.sol.params[2] > payload_x and self.sol.params[1] > payload_y and self.sol.params[0] > payload_z) 
+                or (self.sol.params[1] > payload_x and self.sol.params[0] > payload_y and self.sol.params[2] > payload_z) \
+                or (self.sol.params[1] > payload_x and self.sol.params[2] > payload_y and self.sol.params[0] > payload_z) \
+                or (self.sol.params[2] > payload_x and self.sol.params[0] > payload_y and self.sol.params[1] > payload_z) \
+                or (self.sol.params[2] > payload_x and self.sol.params[1] > payload_y and self.sol.params[0] > payload_z)
         df_check = self.sol.df < self.df_threshold
 
         self.sol.valid = vol_check and payload_check and df_check
 
         return self.sol.valid
+    def _expo_packing(self):
+       val = max(0, min(self.sol.params[0] - payload_x,0) + min(0, self.sol.params[1] - payload_y) + min(0, self.sol.params[2] - payload_z), \
+                   (min(self.sol.params[0] - payload_x,0) + min(0, self.sol.params[2] - payload_y) + min(0, self.sol.params[1] - payload_z)), \
+                   (min(self.sol.params[1] - payload_x,0) + min(0, self.sol.params[0] - payload_y) + min(0, self.sol.params[2] - payload_z)), \
+                   (min(self.sol.params[1] - payload_x,0) + min(0, self.sol.params[2] - payload_y) + min(0, self.sol.params[0] - payload_z)), \
+                   (min(self.sol.params[2] - payload_x,0) + min(0, self.sol.params[0] - payload_y) + min(0, self.sol.params[1] - payload_z)), \
+                   (min(self.sol.params[2] - payload_x,0) + min(0, self.sol.params[1] - payload_y) + min(0, self.sol.params[0] - payload_z)))
+
+       return np.power(val, 2)
+
 
     def _keep_best(self):
         self.best_sol = self.sol
@@ -102,8 +112,8 @@ class SimulatedAnnealing:
             self.sol.df = df
             self.sol.vol = vol
 
-        cost = # TODO
-        true_cost = # TODO
+        cost = # TODO exponential from _expo_packing + drag
+        true_cost = # TODO inf if _expo_packing nonzero + drag
 
         self.sol.cost = cost
         self.sol.true_cost = true_cost
@@ -118,7 +128,7 @@ class SimulatedAnnealing:
         cmd = f'./run_oracle vol {p[0]} {p[1]} {p[2]} {p[3]} {p[4]} {p[5]} {p[6]}'
         vol_str = subprocess.check_output(cmd.split(' ')).decode('utf-8')
         return float(df_str), float(vol_str)
-    
+
     def _get_temperature(self, it):
         pass
 
