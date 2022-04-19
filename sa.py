@@ -82,8 +82,9 @@ class SimulatedAnnealing:
         else:
             #self.sol.params[r] = min(self.sol.params[r] + delta * (1 if random.random() < 0.5 else -1), min(self.sol.params))
             # lol idk, radius being not the smallest will break sim
+            # TODO radius should still be purturbed, but there needs to be checks
             pass
-        self.sol.params[r] = abs(self.sol.params[r]) # TODO This is bad probably, neg p[arams don't make sense tho
+        self.sol.params[r] = abs(self.sol.params[r]) # TODO This is bad probably, neg params don't make sense tho
 
     def _is_valid(self):
         payload_check = \
