@@ -3,6 +3,7 @@ import os
 import random
 import subprocess
 import numpy as np
+from copy import deepcopy
 
 from infer import infer
 from run_oracle import gen_stl, parse_volume
@@ -10,7 +11,7 @@ from run_oracle import gen_stl, parse_volume
 payload_x = 1000
 payload_y = 1000
 payload_z = 300
-df_threshold = 50
+df_threshold = 90
 
 ranges = [
         {'min':1000, 'max':4000},
@@ -37,10 +38,11 @@ class SimulatedAnnealing:
         self.n_iter = n_iter
         self.inner_iter = 5
         self.sol = sol
-        self.prev_sol = sol
-        self.best_sol = sol
+        self.prev_sol = deepcopy(sol)
+        self.best_sol = deepcopy(sol)
         self.best_valid_sol = None
-        self.alpha = 0.5
+        self.alpha = 0.5 # function of temperature
+        self.beta = 0.5 # function of temperature
 
     def run(self):
         self.sol = self.best_sol
@@ -67,10 +69,20 @@ class SimulatedAnnealing:
 
             self._restore_best()
             if i % 1 == 0:
-                print(f'-- Iter {i} --')
-                print(f'> params   : {self.sol.params}')
-                print(f'> cost     : {self.sol.cost}')
-                print(f'> true_cost: {self.sol.true_cost}')
+                print(f'---- Iter {i} ----')
+                print(f'> best params   : {self.sol.params}')
+                print(f'> best cost     : {self.sol.cost}')
+                print(f'> best true_cost: {self.sol.true_cost}')
+                print(f'> best is_valid : {self.sol.valid}')
+                print(f'> best df       : {self.sol.df}')
+                print()
+                if self.best_valid_sol is not None:
+                    print(f'> best valid params   : {self.best_valid_sol.params}')
+                    print(f'> best valid cost     : {self.best_valid_sol.cost}')
+                    print(f'> best valid true_cost: {self.best_valid_sol.true_cost}')
+                    print(f'> best valid df       : {self.best_valid_sol.df}')
+                else:
+                    print('> best valid solution : None')
 
         return self.best_valid_sol
 
@@ -100,7 +112,7 @@ class SimulatedAnnealing:
                 or (self.sol.params[1] > payload_x and self.sol.params[2] > payload_y and self.sol.params[0] > payload_z) \
                 or (self.sol.params[2] > payload_x and self.sol.params[0] > payload_y and self.sol.params[1] > payload_z) \
                 or (self.sol.params[2] > payload_x and self.sol.params[1] > payload_y and self.sol.params[0] > payload_z)
-        df_check = self.sol.df < df
+        df_check = self.sol.df < df_threshold
         self.sol.valid = payload_check and df_check
 
         return self.sol.valid
@@ -121,19 +133,19 @@ class SimulatedAnnealing:
 
 
     def _keep_best(self):
-        self.best_sol = self.sol
+        self.best_sol = deepcopy(self.sol)
 
     def _keep_best_valid(self):
-        self.best_valid_sol = self.sol
+        self.best_valid_sol = deepcopy(self.sol)
 
     def _keep_prev(self):
-        self.prev_sol = self.sol
+        self.prev_sol = deepcopy(self.sol)
 
     def _restore_best(self):
-        self.sol = self.best_sol
+        self.sol = deepcopy(self.best_sol)
 
     def _restore_prev(self):
-        self.sol = self.prev_sol
+        self.sol = deepcopy(self.prev_sol)
 
     def _compute_cost(self):
         df, vol = self._evaluate(self.sol)
@@ -145,8 +157,9 @@ class SimulatedAnnealing:
         df_cost = self._df_cost()
         df_cost_normalized = df_cost
 
-        cost = self.alpha * packing_cost_normalized + (1-self.alpha) * df_cost_normalized
         true_cost = self.sol.vol
+        cost = self.alpha * packing_cost_normalized + (1-self.alpha) * df_cost_normalized
+        cost = self.beta * true_cost + (1-self.beta) * cost
 
         self.sol.cost = cost
         self.sol.true_cost = true_cost
@@ -171,6 +184,11 @@ class SimulatedAnnealing:
 
 if __name__ == '__main__':
     args = [int(arg) for arg in sys.argv[1:]]
-    init_sol = Solution(args)
-    sa = SimulatedAnnealing(init_sol, 1000)
+    sol = Solution(args)
+    # sol.params[0] += 100
+    # sol.df = 100
+    # init_sol.df = 1000
+    # print(init_sol.df)
+    # print(sol.df)
+    sa = SimulatedAnnealing(sol, 1000)
     sa.run()
