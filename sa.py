@@ -3,10 +3,14 @@ import os
 import random
 import subprocess
 import numpy as np
+
+from infer import infer
+from run_oracle import gen_stl, parse_volume
+
 payload_x = 1000
 payload_y = 1000
 payload_z = 300
-df = 50
+df_threshold = 50
 
 ranges = [
         {'min':1000, 'max':4000},
@@ -36,6 +40,7 @@ class SimulatedAnnealing:
         self.prev_sol = sol
         self.best_sol = sol
         self.best_valid_sol = None
+        self.alpha = 0.5
 
     def run(self):
         self.sol = self.best_sol
@@ -61,9 +66,11 @@ class SimulatedAnnealing:
                     self._restore_prev()
 
             self._restore_best()
-            # if i % 20 == 0:
-                # print(self.sol.params)
-                # print(self.sol.cost, self.sol.true_cost)
+            if i % 1 == 0:
+                print(f'-- Iter {i} --')
+                print(f'> params   : {self.sol.params}')
+                print(f'> cost     : {self.sol.cost}')
+                print(f'> true_cost: {self.sol.true_cost}')
 
         return self.best_valid_sol
 
@@ -81,8 +88,8 @@ class SimulatedAnnealing:
 
         # adjust radius (params[4]) to be less than half of min of length, width, height
         min_dim = min(self.sol.params[0], self.sol.params[1], self.sol.params[2])
-        if min_dim / 2 < self.sol.params[4]:
-            self.sol.params[4] = int(min_dim / 2)
+        if min_dim / 2 <= self.sol.params[4]:
+            self.sol.params[4] = int((min_dim-1) / 2)
         self.sol.params[r] = int(self.sol.params[r])
 
     def _is_valid(self):
@@ -109,7 +116,7 @@ class SimulatedAnnealing:
        return val
 
     def _df_cost(self):
-        val = max(self.sol.df - df, 0)
+        val = max(self.sol.df - df_threshold, 0)
         return val
 
 
@@ -129,19 +136,17 @@ class SimulatedAnnealing:
         self.sol = self.prev_sol
 
     def _compute_cost(self):
-        if self.sol.df is None:
-            df, vol = self._evaluate(self.sol)
-            self.sol.df = df
-            self.sol.vol = vol
+        df, vol = self._evaluate(self.sol)
+        self.sol.df = df
+        self.sol.vol = vol
 
         packing_cost = self._packing_cost()
         packing_cost_normalized = packing_cost
         df_cost = self._df_cost()
         df_cost_normalized = df_cost
 
-        cost = alpha * packing_cost_normalized + (1-alpha) * df_cost_normalized
-        # cost = np.exp(fits) + self.sol.df
-        true_cost = float('inf') if fits else self.sol.df
+        cost = self.alpha * packing_cost_normalized + (1-self.alpha) * df_cost_normalized
+        true_cost = self.sol.vol
 
         self.sol.cost = cost
         self.sol.true_cost = true_cost
@@ -151,11 +156,10 @@ class SimulatedAnnealing:
 
     def _evaluate(self, sol):
         p = sol.params
-        cmd = f'python3 infer.py {p[0]} {p[1]} {p[2]} {p[3]} {p[4]} {p[5]} {p[6]}'
-        df_str = subprocess.check_output(cmd.split(' ')).decode('utf-8')
-        cmd = f'./run_oracle vol {p[0]} {p[1]} {p[2]} {p[3]} {p[4]} {p[5]} {p[6]}'
-        vol_str = subprocess.check_output(cmd.split(' ')).decode('utf-8')
-        return float(df_str), float(vol_str)
+        df = infer(p)
+        gen_stl(*p)
+        vol = parse_volume()
+        return df, vol
 
 
     def _get_temperature(self, it):

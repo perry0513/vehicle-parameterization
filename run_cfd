@@ -1,2 +1,2 @@
 #!/bin/sh
-./run_oracle cfd $1 $2 $3 $4 $5 $6 $7
+python3 run_oracle.py cfd $1 $2 $3 $4 $5 $6 $7
