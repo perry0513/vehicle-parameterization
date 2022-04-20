@@ -6,13 +6,14 @@ import numpy as np
 payload_x = 1000
 payload_y = 1000
 payload_z = 300
+df = 50
 
 ranges = [
         {'min':1000, 'max':4000},
         {'min':400, 'max':2000},
         {'min':400, 'max':2000},
-        {'min':200, 'max':1000},
         {'min':1000, 'max':4000},
+        {'min':200, 'max':1000},
         {'min':1000, 'max':4000},
         {'min':10, 'max':100},
         ]
@@ -35,7 +36,6 @@ class SimulatedAnnealing:
         self.prev_sol = sol
         self.best_sol = sol
         self.best_valid_sol = None
-        self.best_cost = float('inf')
 
     def run(self):
         self.sol = self.best_sol
@@ -46,26 +46,24 @@ class SimulatedAnnealing:
             for j in range(self.inner_iter):
                 self._perturb()
                 cost, true_cost = self._compute_cost()
-                valid = not self._is_valid()
+                valid = self._is_valid()
 
                 if self.best_valid_sol is None and valid:
                     self._keep_best_valid()
 
-                # print(cost, self.best_cost, random.random(), p)
-                if (cost < self.best_cost) or random.random() < p:
+                if cost < self.best_sol.cost or random.random() < p:
                     self._keep_prev()
-                    if cost < self.best_cost:
+                    if cost < self.best_sol.cost:
                         self._keep_best()
                     if valid and true_cost < self.best_valid_sol.true_cost:
-                        print(self.sol)
                         self._keep_best_valid()
                 else:
                     self._restore_prev()
 
             self._restore_best()
-            if i % 20 == 0:
-                print(self.sol.params)
-                print(self.sol.cost, self.sol.true_cost)
+            # if i % 20 == 0:
+                # print(self.sol.params)
+                # print(self.sol.cost, self.sol.true_cost)
 
         return self.best_valid_sol
 
@@ -76,15 +74,16 @@ class SimulatedAnnealing:
         rmin = (ranges[r]['max'] - ranges[r]['min']) * 0.05
         rmax = (ranges[r]['max'] - ranges[r]['min']) * 0.10
         delta = rmin + (rmax - rmin) * random.random()
-        if r != 4:
-       # if r != 4 and r != 6:
-            self.sol.params[r] += delta * (1 if random.random() < 0.5 else -1)
-        else:
-            #self.sol.params[r] = min(self.sol.params[r] + delta * (1 if random.random() < 0.5 else -1), min(self.sol.params))
-            # lol idk, radius being not the smallest will break sim
-            # TODO radius should still be purturbed, but there needs to be checks
-            pass
-        self.sol.params[r] = abs(self.sol.params[r]) # TODO This is bad probably, neg params don't make sense tho
+        self.sol.params[r] += delta * (1 if random.random() < 0.5 else -1)
+        
+        self.sol.params[r] = min(self.sol.params[r], ranges[r]['max'])
+        self.sol.params[r] = max(self.sol.params[r], ranges[r]['min'])
+
+        # adjust radius (params[4]) to be less than half of min of length, width, height
+        min_dim = min(self.sol.params[0], self.sol.params[1], self.sol.params[2])
+        if min_dim / 2 < self.sol.params[4]:
+            self.sol.params[4] = int(min_dim / 2)
+        self.sol.params[r] = int(self.sol.params[r])
 
     def _is_valid(self):
         payload_check = \
@@ -94,18 +93,24 @@ class SimulatedAnnealing:
                 or (self.sol.params[1] > payload_x and self.sol.params[2] > payload_y and self.sol.params[0] > payload_z) \
                 or (self.sol.params[2] > payload_x and self.sol.params[0] > payload_y and self.sol.params[1] > payload_z) \
                 or (self.sol.params[2] > payload_x and self.sol.params[1] > payload_y and self.sol.params[0] > payload_z)
-        self.sol.valid = payload_check
+        df_check = self.sol.df < df
+        self.sol.valid = payload_check and df_check
 
         return self.sol.valid
-    def _expo_packing(self):
-       val = max(0, min(self.sol.params[0] - payload_x,0) + min(0, self.sol.params[1] - payload_y) + min(0, self.sol.params[2] - payload_z), \
-                   (min(self.sol.params[0] - payload_x,0) + min(0, self.sol.params[2] - payload_y) + min(0, self.sol.params[1] - payload_z)), \
-                   (min(self.sol.params[1] - payload_x,0) + min(0, self.sol.params[0] - payload_y) + min(0, self.sol.params[2] - payload_z)), \
-                   (min(self.sol.params[1] - payload_x,0) + min(0, self.sol.params[2] - payload_y) + min(0, self.sol.params[0] - payload_z)), \
-                   (min(self.sol.params[2] - payload_x,0) + min(0, self.sol.params[0] - payload_y) + min(0, self.sol.params[1] - payload_z)), \
-                   (min(self.sol.params[2] - payload_x,0) + min(0, self.sol.params[1] - payload_y) + min(0, self.sol.params[0] - payload_z)))
 
-       return np.power(val, 2)
+    def _packing_cost(self):
+       val = min((min(self.sol.params[0] - payload_x, 0) ** 2 + min(self.sol.params[1] - payload_y, 0) ** 2 + min(self.sol.params[2] - payload_z, 0) ** 2), \
+                 (min(self.sol.params[0] - payload_x, 0) ** 2 + min(self.sol.params[2] - payload_y, 0) ** 2 + min(self.sol.params[1] - payload_z, 0) ** 2), \
+                 (min(self.sol.params[1] - payload_x, 0) ** 2 + min(self.sol.params[0] - payload_y, 0) ** 2 + min(self.sol.params[2] - payload_z, 0) ** 2), \
+                 (min(self.sol.params[1] - payload_x, 0) ** 2 + min(self.sol.params[2] - payload_y, 0) ** 2 + min(self.sol.params[0] - payload_z, 0) ** 2), \
+                 (min(self.sol.params[2] - payload_x, 0) ** 2 + min(self.sol.params[0] - payload_y, 0) ** 2 + min(self.sol.params[1] - payload_z, 0) ** 2), \
+                 (min(self.sol.params[2] - payload_x, 0) ** 2 + min(self.sol.params[1] - payload_y, 0) ** 2 + min(self.sol.params[0] - payload_z, 0) ** 2))
+
+       return val
+
+    def _df_cost(self):
+        val = max(self.sol.df - df, 0)
+        return val
 
 
     def _keep_best(self):
@@ -124,14 +129,18 @@ class SimulatedAnnealing:
         self.sol = self.prev_sol
 
     def _compute_cost(self):
-        # if self.sol.df is None:
-        if True:
+        if self.sol.df is None:
             df, vol = self._evaluate(self.sol)
             self.sol.df = df
             self.sol.vol = vol
 
-        fits = self._expo_packing()
-        cost = np.exp(fits) + self.sol.df
+        packing_cost = self._packing_cost()
+        packing_cost_normalized = packing_cost
+        df_cost = self._df_cost()
+        df_cost_normalized = df_cost
+
+        cost = alpha * packing_cost_normalized + (1-alpha) * df_cost_normalized
+        # cost = np.exp(fits) + self.sol.df
         true_cost = float('inf') if fits else self.sol.df
 
         self.sol.cost = cost
@@ -157,7 +166,7 @@ class SimulatedAnnealing:
 
 
 if __name__ == '__main__':
-    args = [float(arg) for arg in sys.argv[1:]]
+    args = [int(arg) for arg in sys.argv[1:]]
     init_sol = Solution(args)
     sa = SimulatedAnnealing(init_sol, 1000)
     sa.run()
