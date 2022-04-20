@@ -72,7 +72,8 @@ def gen_stl(length, width, height, noseLength, radius, tailLength, endRadius):
                 ]
             }
 
-    stl_filename = f'{stl_dir}/boxfish_{length}_{width}_{height}_{noseLength}_{radius}_{tailLength}_{endRadius}.stl'
+    # stl_filename = f'{stl_dir}/boxfish_{length}_{width}_{height}_{noseLength}_{radius}_{tailLength}_{endRadius}.stl'
+    stl_filename = 'tmp.stl'
     json_str = json.dumps(data, separators=(',',':'))
     stl_cmd = f"npx jscad jscad-generator.js -o {stl_filename} --jsonComponentModel {json_str}"
     # print(f'Execute command: {stl_cmd}')
@@ -112,6 +113,10 @@ def parse_volume():
         line = f.readlines()[-1]
         return json.loads(line)['volume']
 
+def parse_area():
+    with open(stl_log_filename, 'r') as f:
+        line = f.readlines()[-1]
+        return json.loads(line)['area']
 
 if __name__ == '__main__':
     run_cfd = sys.argv[1] == 'cfd'

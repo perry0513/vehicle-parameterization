@@ -6,12 +6,9 @@ import numpy as np
 from copy import deepcopy
 
 from infer import infer
-from run_oracle import gen_stl, parse_volume
+from run_oracle import gen_stl, parse_volume, parse_area
+from uuv import *
 
-payload_x = 1000
-payload_y = 1000
-payload_z = 300
-df_threshold = 90
 
 ranges = [
         {'min':1000, 'max':4000},
@@ -31,6 +28,7 @@ class Solution:
         self.true_cost = 1000000
         self.df = None
         self.vol = None
+        self.area = None
 
 
 class SimulatedAnnealing:
@@ -88,7 +86,6 @@ class SimulatedAnnealing:
 
 
     def _perturb(self):
-        # if index is 4, it needs to be min of all
         r = random.randint(0, len(ranges)- 1) # lol randint is inclusive on end idx for some reason
         rmin = (ranges[r]['max'] - ranges[r]['min']) * 0.05
         rmax = (ranges[r]['max'] - ranges[r]['min']) * 0.10
@@ -148,10 +145,12 @@ class SimulatedAnnealing:
         self.sol = deepcopy(self.prev_sol)
 
     def _compute_cost(self):
-        df, vol = self._evaluate(self.sol)
+        df, vol, area = self._evaluate(self.sol)
         self.sol.df = df
         self.sol.vol = vol
+        self.sol.area = area
 
+        # TODO: normalize cost
         packing_cost = self._packing_cost()
         packing_cost_normalized = packing_cost
         df_cost = self._df_cost()
@@ -172,7 +171,8 @@ class SimulatedAnnealing:
         df = infer(p)
         gen_stl(*p)
         vol = parse_volume()
-        return df, vol
+        area = parse_area()
+        return df, vol, area
 
 
     def _get_temperature(self, it):
@@ -185,10 +185,5 @@ class SimulatedAnnealing:
 if __name__ == '__main__':
     args = [int(arg) for arg in sys.argv[1:]]
     sol = Solution(args)
-    # sol.params[0] += 100
-    # sol.df = 100
-    # init_sol.df = 1000
-    # print(init_sol.df)
-    # print(sol.df)
     sa = SimulatedAnnealing(sol, 1000)
     sa.run()
