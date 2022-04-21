@@ -168,7 +168,11 @@ class SimulatedAnnealing:
 
 if __name__ == '__main__':
     # TODO verify args
-    args = [int(arg) for arg in sys.argv[1:]]
+    if len(sys.argv[1:]) != 7:
+        print('invalid number of arguments, defaulting to 2379 921 641 3057 204 2023 67')
+        args = [int(i) for i in "2379 921 641 3057 204 2023 67".split()]
+    else:
+        args = [int(arg) for arg in sys.argv[1:]]
     sol = Solution(args)
     sa = SimulatedAnnealing(sol, 1000)
     sa.run()
