@@ -9,6 +9,7 @@ from infer import infer
 from run_oracle import gen_stl, parse_volume, parse_area
 from uuv import *
 
+from py3dbp import Packer, Bin, Item
 
 ranges = [
         {'min':1000, 'max':4000},
@@ -24,8 +25,8 @@ class Solution:
     def __init__(self, params):
         self.params = params
         self.valid = False
-        self.cost = 1000000
-        self.true_cost = 1000000
+        self.cost = float('inf')
+        self.true_cost = float('inf')
         self.df = None
         self.vol = None
         self.area = None
@@ -66,7 +67,7 @@ class SimulatedAnnealing:
                     self._restore_prev()
 
             self._restore_best()
-            if i % 1 == 0:
+            if i % 5 == 0:
                 print(f'---- Iter {i} ----')
                 print(f'> best params   : {self.sol.params}')
                 print(f'> best cost     : {self.sol.cost}')
@@ -91,7 +92,7 @@ class SimulatedAnnealing:
         rmax = (ranges[r]['max'] - ranges[r]['min']) * 0.10
         delta = rmin + (rmax - rmin) * random.random()
         self.sol.params[r] += delta * (1 if random.random() < 0.5 else -1)
-        
+
         self.sol.params[r] = min(self.sol.params[r], ranges[r]['max'])
         self.sol.params[r] = max(self.sol.params[r], ranges[r]['min'])
 
@@ -102,27 +103,10 @@ class SimulatedAnnealing:
         self.sol.params[r] = int(self.sol.params[r])
 
     def _is_valid(self):
-        payload_check = \
-                   (self.sol.params[0] > payload_x and self.sol.params[1] > payload_y and self.sol.params[2] > payload_z) \
-                or (self.sol.params[0] > payload_x and self.sol.params[2] > payload_y and self.sol.params[1] > payload_z) \
-                or (self.sol.params[1] > payload_x and self.sol.params[0] > payload_y and self.sol.params[2] > payload_z) \
-                or (self.sol.params[1] > payload_x and self.sol.params[2] > payload_y and self.sol.params[0] > payload_z) \
-                or (self.sol.params[2] > payload_x and self.sol.params[0] > payload_y and self.sol.params[1] > payload_z) \
-                or (self.sol.params[2] > payload_x and self.sol.params[1] > payload_y and self.sol.params[0] > payload_z)
-        df_check = self.sol.df < df_threshold
-        self.sol.valid = payload_check and df_check
+        return pack(self.sol)
 
-        return self.sol.valid
-
-    def _packing_cost(self):
-       val = min((min(self.sol.params[0] - payload_x, 0) ** 2 + min(self.sol.params[1] - payload_y, 0) ** 2 + min(self.sol.params[2] - payload_z, 0) ** 2), \
-                 (min(self.sol.params[0] - payload_x, 0) ** 2 + min(self.sol.params[2] - payload_y, 0) ** 2 + min(self.sol.params[1] - payload_z, 0) ** 2), \
-                 (min(self.sol.params[1] - payload_x, 0) ** 2 + min(self.sol.params[0] - payload_y, 0) ** 2 + min(self.sol.params[2] - payload_z, 0) ** 2), \
-                 (min(self.sol.params[1] - payload_x, 0) ** 2 + min(self.sol.params[2] - payload_y, 0) ** 2 + min(self.sol.params[0] - payload_z, 0) ** 2), \
-                 (min(self.sol.params[2] - payload_x, 0) ** 2 + min(self.sol.params[0] - payload_y, 0) ** 2 + min(self.sol.params[1] - payload_z, 0) ** 2), \
-                 (min(self.sol.params[2] - payload_x, 0) ** 2 + min(self.sol.params[1] - payload_y, 0) ** 2 + min(self.sol.params[0] - payload_z, 0) ** 2))
-
-       return val
+    def _packing_cost(self): # TODO this should be normalized / more dynamic
+       return self.sol.cost if not pack(self.sol)  else 0
 
     def _df_cost(self):
         val = max(self.sol.df - df_threshold, 0)
@@ -183,6 +167,7 @@ class SimulatedAnnealing:
 
 
 if __name__ == '__main__':
+    # TODO verify args
     args = [int(arg) for arg in sys.argv[1:]]
     sol = Solution(args)
     sa = SimulatedAnnealing(sol, 1000)
