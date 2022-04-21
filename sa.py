@@ -25,11 +25,12 @@ class Solution:
     def __init__(self, params):
         self.params = params
         self.valid = False
-        self.cost = float('inf')
-        self.true_cost = float('inf')
+        self.cost = 100000
+        self.true_cost = 100000
         self.df = None
         self.vol = None
         self.area = None
+        self.packing = None
 
 
 class SimulatedAnnealing:
@@ -51,6 +52,7 @@ class SimulatedAnnealing:
             p = self._get_prob(t)
             for j in range(self.inner_iter):
                 self._perturb()
+                self.sol.packing = packing_problem(self.sol)
                 cost, true_cost = self._compute_cost()
                 valid = self._is_valid()
 
@@ -73,6 +75,7 @@ class SimulatedAnnealing:
                 print(f'> best cost     : {self.sol.cost}')
                 print(f'> best true_cost: {self.sol.true_cost}')
                 print(f'> best is_valid : {self.sol.valid}')
+                print(f'> best placement : {self.sol.packing.items}')
                 print(f'> best df       : {self.sol.df}')
                 print()
                 if self.best_valid_sol is not None:
@@ -103,10 +106,13 @@ class SimulatedAnnealing:
         self.sol.params[r] = int(self.sol.params[r])
 
     def _is_valid(self):
-        return pack(self.sol)
+        if self.sol.packing.evaluated:
+            return self.sol.packing.feisable
+        self.sol.packing.pack()
+        return self.sol.packing.feisable
 
     def _packing_cost(self): # TODO this should be normalized / more dynamic
-       return self.sol.cost if not pack(self.sol)  else 0
+        return self.sol.cost if not self._is_valid() else 0
 
     def _df_cost(self):
         val = max(self.sol.df - df_threshold, 0)
@@ -169,8 +175,8 @@ class SimulatedAnnealing:
 if __name__ == '__main__':
     # TODO verify args
     if len(sys.argv[1:]) != 7:
-        print('invalid number of arguments, defaulting to 2379 921 641 3057 204 2023 67')
-        args = [int(i) for i in "2379 921 641 3057 204 2023 67".split()]
+        print('invalid number of arguments, defaulting to 237900 92100 64100 305700 2040 202300 670')
+        args = [int(i) for i in "237900 92100 64100 305700 2040 202300 670".split()]
     else:
         args = [int(arg) for arg in sys.argv[1:]]
     sol = Solution(args)
