@@ -25,8 +25,8 @@ class Solution:
     def __init__(self, params):
         self.params = params
         self.valid = False
-        self.cost = 100000
-        self.true_cost = 100000
+        self.cost = None
+        self.true_cost = None
         self.df = None
         self.vol = None
         self.area = None
@@ -43,6 +43,7 @@ class SimulatedAnnealing:
         self.best_valid_sol = None
         self.alpha = 0.5 # function of temperature
         self.beta = 0.5 # function of temperature
+
 
     def run(self):
         self.sol = self.best_sol
@@ -69,19 +70,20 @@ class SimulatedAnnealing:
                     self._restore_prev()
 
             self._restore_best()
-            if i % 5 == 0:
+            if i % 1 == 0:
                 print(f'---- Iter {i} ----')
                 print(f'> best params   : {self.sol.params}')
                 print(f'> best cost     : {self.sol.cost}')
                 print(f'> best true_cost: {self.sol.true_cost}')
                 print(f'> best is_valid : {self.sol.valid}')
-                print(f'> best placement : {self.sol.packing.items}')
+                print(f'> best placement: {self.sol.packing.items}')
                 print(f'> best df       : {self.sol.df}')
                 print()
                 if self.best_valid_sol is not None:
                     print(f'> best valid params   : {self.best_valid_sol.params}')
                     print(f'> best valid cost     : {self.best_valid_sol.cost}')
                     print(f'> best valid true_cost: {self.best_valid_sol.true_cost}')
+                    print(f'> best valid placement: {self.best_valid_sol.packing.items}')
                     print(f'> best valid df       : {self.best_valid_sol.df}')
                 else:
                     print('> best valid solution : None')
@@ -89,10 +91,13 @@ class SimulatedAnnealing:
         return self.best_valid_sol
 
 
-    def _perturb(self):
+    def _init(self):
+        _perturb(init=True)
+
+    def _perturb(self, init=False):
         r = random.randint(0, len(ranges)- 1) # lol randint is inclusive on end idx for some reason
-        rmin = (ranges[r]['max'] - ranges[r]['min']) * 0.05
-        rmax = (ranges[r]['max'] - ranges[r]['min']) * 0.10
+        rmin = (ranges[r]['max'] - ranges[r]['min']) * 0.05 # TODO: shud depend on temperature
+        rmax = (ranges[r]['max'] - ranges[r]['min']) * 0.10 # TODO: shud depend on temperature
         delta = rmin + (rmax - rmin) * random.random()
         self.sol.params[r] += delta * (1 if random.random() < 0.5 else -1)
 
@@ -106,10 +111,10 @@ class SimulatedAnnealing:
         self.sol.params[r] = int(self.sol.params[r])
 
     def _is_valid(self):
-        if self.sol.packing.evaluated:
-            return self.sol.packing.feisable
-        self.sol.packing.pack()
-        return self.sol.packing.feisable
+        pack_valid = self.sol.packing.feasible if self.sol.packing.evaluated else self.sol.packing.pack()
+        df_valid = self.sol.df <= df_threshold
+        self.sol.valid = pack_valid and df_valid
+        return self.sol.valid
 
     def _packing_cost(self): # TODO this should be normalized / more dynamic
         return self.sol.cost if not self._is_valid() else 0
@@ -175,8 +180,8 @@ class SimulatedAnnealing:
 if __name__ == '__main__':
     # TODO verify args
     if len(sys.argv[1:]) != 7:
-        print('invalid number of arguments, defaulting to 237900 92100 64100 305700 2040 202300 670')
-        args = [int(i) for i in "237900 92100 64100 305700 2040 202300 670".split()]
+        print('invalid number of arguments, defaulting to 2268 1370 781 2545 378 1183 28')
+        args = [int(i) for i in "2268 1370 781 2545 378 1183 28".split()]
     else:
         args = [int(arg) for arg in sys.argv[1:]]
     sol = Solution(args)
