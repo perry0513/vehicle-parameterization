@@ -24,7 +24,7 @@ class packing_problem:
         self.sol = sol
         self.items = {}
         self.evaluated = False
-        self.feisable = False
+        self.feasible = False
 
 
     def pack(self):
@@ -66,11 +66,12 @@ class packing_problem:
         # TODO: check whether PV and payload can fit in vehicle
         packer = Packer()
         packer.add_bin(Bin('main-cabin', params[0], params[1], params[2], 10))
-        packer.add_item(Item("pv", bat_length + PV_thickness, bat_width + PV_thickness, bat_depth + PV_thickness, 0)) # not using weight for packing
+        packer.add_item(Item("pv", (bat_length + PV_thickness) * 1e3, (bat_width + PV_thickness) * 1e3, (bat_depth + PV_thickness) * 1e3, 0)) # not using weight for packing
         packer.add_item(Item("payload", payload_x, payload_y, payload_z, 0)) # not using weight for packing
         packer.pack()
         for item in packer.bins[0].items:
             self.items[item.name] = item.position
         self.evaluated = True
-        # self.feisable = is_neutrally_buoyant and len(packer.bins[0].unfitted_items) == 0
-        self.feisable = len(packer.bins[0].unfitted_items) == 0
+        # self.feasible = is_neutrally_buoyant and len(packer.bins[0].unfitted_items) == 0
+        self.feasible = len(packer.bins[0].unfitted_items) == 0
+        return self.feasible
