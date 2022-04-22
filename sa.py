@@ -111,13 +111,17 @@ class SimulatedAnnealing:
         self.sol.params[r] = int(self.sol.params[r])
 
     def _is_valid(self):
-        pack_valid = self.sol.packing.feasible if self.sol.packing.evaluated else self.sol.packing.pack()
+        if not self.sol.packing.evaluated:
+            self.sol.packing.pack()
+        pack_valid = self.sol.packing.feasible
         df_valid = self.sol.df <= df_threshold
         self.sol.valid = pack_valid and df_valid
         return self.sol.valid
 
     def _packing_cost(self): # TODO this should be normalized / more dynamic
-        return self.sol.cost if not self._is_valid() else 0
+        if not self.sol.packing.evaluated:
+            self.sol.packing.pack()
+        return self.sol.packing.loss
 
     def _df_cost(self):
         val = max(self.sol.df - df_threshold, 0)
@@ -174,14 +178,13 @@ class SimulatedAnnealing:
         return 0 if not it else self.n_iter / it   # TODO bruh
 
     def _get_prob(self, t):
-        return .25 #TODO dynamic
+        return .05 #TODO dynamic
 
 
 if __name__ == '__main__':
-    # TODO verify args
     if len(sys.argv[1:]) != 7:
-        print('invalid number of arguments, defaulting to 2268 1370 781 2545 378 1183 28')
-        args = [int(i) for i in "2268 1370 781 2545 378 1183 28".split()]
+        print('invalid number of arguments, defaulting...')
+        args = [int(i) for i in "50000 2000 2000 10 5 10 5".split()]
     else:
         args = [int(arg) for arg in sys.argv[1:]]
     sol = Solution(args)
