@@ -47,11 +47,14 @@ class packing_problem:
         # energy_needed = # kWh
         bat_volume = energy_needed / bat_energy_density_per_vol # m^3
         bat_mass = bat_volume * bat_density # kg
-        bat_length = length # m
+        bat_length = length - 2 * PV_thickness # m
         bat_width = math.sqrt(bat_volume / length) # m
-        bat_depth = math.sqrt(bat_volume / length) # m
+        bat_height = math.sqrt(bat_volume / length) # m
 
-        PV_disp_volume = (bat_length + PV_thickness) * (bat_width + PV_thickness) * (bat_depth + PV_thickness) # m^3
+        PV_length = length # m
+        PV_width = bat_width + 2 * PV_thickness # m
+        PV_height = bat_height + 2 * PV_thickness # m
+        PV_disp_volume = PV_length * PV_width * PV_height # m^3
         PV_volume = PV_disp_volume - bat_volume # m^3
         PV_mass = PV_volume * PV_density # kg
         PV_buoyancy = PV_disp_volume * water_density # kg
@@ -71,52 +74,60 @@ class packing_problem:
         spare_volume = vehicle_volume - fairing_disp_volume - PV_disp_volume - payload_volume # m^3
         is_neutrally_buoyant = spare_volume > float_volume
         packer = Packer()
-        packer.add_item(Item("pv", (bat_length + PV_thickness) * 1e3, (bat_width + PV_thickness) * 1e3, (bat_depth + PV_thickness) * 1e3, 0)) # not using weight for packing
+        packer.add_item(Item("pv", PV_length * 1e3, PV_width * 1e3, PV_height * 1e3, 0)) # not using weight for packing
         packer.add_item(Item("payload", payload_x, payload_y, payload_z, 0)) # not using weight for packing
         packer.add_bin(Bin('main-cabin', self.sol.params[0], self.sol.params[1], self.sol.params[2], 10))
-        packingloss = self._pack(packer)
-        self.loss = math.exp(math.log10(total_in_water_weight) * packingloss) + total_in_water_weight
+        packing_loss = self._pack(packer) # volume needed
+        # self.loss = math.exp(math.log10(total_in_water_weight) * packingloss) + total_in_water_weight
+        # TODO: need normalizing
+        print(packing_loss * 1e-9, (float_volume - spare_volume) * 1e-9)
+        self.loss = max(packing_loss, 0) + max(float_volume - spare_volume, 0)
         self.evaluated = True
-        return packingloss
+        return packing_loss
 
     def _pack(self, packer):
         x = self.sol.params[0]
         y = self.sol.params[1]
         z = self.sol.params[2]
+        orig_x, orig_y, orig_z = x, y, z
 
         packer.pack()
-        loss = 0
-        inx = x * 1.1
-        iny = y * 1.1
-        inz = z * 1.1
+        # loss = 0
+        inx = x * 0.1
+        iny = y * 0.1
+        inz = z * 0.1
 #         print(self.sol.params)
         while len(packer.bins[0].unfitted_items) != 0:
-            loss += 1
+            # loss += 1
             x += inx
             packer.bins[0] = Bin('main-cabin', x,y,z, 10)
             packer.pack()
             if len(packer.bins[0].unfitted_items) == 0:
-                print("fixed on x")
+                print("new x:", x)
                 break
             x -= inx
             y += iny
             packer.bins[0] = Bin('main-cabin', x,y,z, 10)
             packer.pack()
             if len(packer.bins[0].unfitted_items) == 0:
-                print("fixed on y")
+                print("new y:", y)
                 break
             y -= iny
             z += inz
             packer.bins[0] = Bin('main-cabin', x,y,z, 10)
             packer.pack()
             if len(packer.bins[0].unfitted_items) == 0:
-                print("fixed on z")
+                print("new z:", z)
                 break
             x += inx
             y += iny
             packer.bins[0] = Bin('main-cabin', x,y,z, 10)
             packer.pack()
+            if len(packer.bins[0].unfitted_items) == 0:
+                print("new:", x, y, z)
+                break
 
+        loss = x * y * z - orig_x * orig_y * orig_z
         # self.feasible = is_neutrally_buoyant and len(packer.bins[0].unfitted_items) == 0
         self.feasible = loss == 0
         if self.feasible:
