@@ -30,7 +30,7 @@ class Solution:
         self.df = None
         self.vol = None
         self.area = None
-        self.packing = None
+        self.pack = None
 
 
 class SimulatedAnnealing:
@@ -38,29 +38,38 @@ class SimulatedAnnealing:
         self.n_iter = n_iter
         self.inner_iter = 5
         self.sol = sol
-        self.prev_sol = deepcopy(sol)
-        self.best_sol = deepcopy(sol)
+        self.prev_sol = None
+        self.best_sol = None
         self.best_valid_sol = None
         self.alpha = 0.5 # function of temperature
         self.beta = 0.5 # function of temperature
-
+        self.avg_pack_cost = None
+        self.avg_buoy_cost = None
+        self.df_cost = None
+        self.avg_vol_cost = None
+        self.rand_n = 10
+        self.t = None
+        self.T1 = None
 
     def run(self):
-        self.sol = self.best_sol
+        self._init()
         cost, true_cost = 0.0, 0.0
-        for i in range(self.n_iter):
-            t = self._get_temperature(i)
-            p = self._get_prob(t)
+        for i in range(1, self.n_iter+1):
+            self.t = self._get_temperature(i)
+            self.avg_delta_cost = 0
             for j in range(self.inner_iter):
                 self._perturb()
-                self.sol.packing = packing_problem(self.sol)
                 cost, true_cost = self._compute_cost()
                 valid = self._is_valid()
+                delta_cost = self.sol.cost - self.prev_sol.cost
+                accept_p = min(1.0, math.exp(-delta_cost / self.t))
+
+                self.avg_delta_cost += abs(delta_cost)
 
                 if self.best_valid_sol is None and valid:
                     self._keep_best_valid()
 
-                if cost < self.best_sol.cost or random.random() < p:
+                if cost < self.best_sol.cost or random.random() < accept_p:
                     self._keep_prev()
                     if cost < self.best_sol.cost:
                         self._keep_best()
@@ -76,25 +85,73 @@ class SimulatedAnnealing:
                 print(f'> best cost     : {self.sol.cost}')
                 print(f'> best true_cost: {self.sol.true_cost}')
                 print(f'> best is_valid : {self.sol.valid}')
-                print(f'> best placement: {self.sol.packing.items}')
+                print(f'> best placement: {self.sol.pack.items}')
                 print(f'> best df       : {self.sol.df}')
                 print()
                 if self.best_valid_sol is not None:
                     print(f'> best valid params   : {self.best_valid_sol.params}')
                     print(f'> best valid cost     : {self.best_valid_sol.cost}')
                     print(f'> best valid true_cost: {self.best_valid_sol.true_cost}')
-                    print(f'> best valid placement: {self.best_valid_sol.packing.items}')
+                    print(f'> best valid placement: {self.best_valid_sol.pack.items}')
                     print(f'> best valid df       : {self.best_valid_sol.df}')
                 else:
                     print('> best valid solution : None')
+
+            self.avg_delta_cost /= self.inner_iter
 
         return self.best_valid_sol
 
 
     def _init(self):
-        _perturb(init=True)
+        temp_sol = deepcopy(self.sol)
+        pack_costs = []
+        buoy_costs = []
+        df_costs = []
+        vol_costs = []
+        valids = []
+        for i in range(self.rand_n):
+            self._perturb(init=True)
+
+            df, vol, area = self._evaluate(self.sol)
+            self.sol.df = df
+            self.sol.vol = vol
+            self.sol.area = area
+
+            self.sol.pack = packing_problem(self.sol)
+            valid = self._is_valid()
+
+            pack_cost = self._pack_cost()
+            buoy_cost = self._buoy_cost()
+            df_cost = self._df_cost()
+            vol_cost = vol
+
+            pack_costs.append(pack_cost)
+            buoy_costs.append(buoy_cost)
+            df_costs.append(df_cost)
+            vol_costs.append(vol_cost)
+            valids.append(valid)
+
+        # import IPython; IPython.embed()
+        eps = 1e-4
+        self.avg_pack_cost = sum(pack_costs) / len(pack_costs)
+        self.avg_pack_cost += eps
+        self.avg_buoy_cost = sum(buoy_costs) / len(buoy_costs)
+        self.avg_buoy_cost += eps
+        self.avg_df_cost = sum(df_costs) / len(df_costs)
+        self.avg_df_cost += eps
+        self.avg_vol_cost = sum(vol_costs) / len(vol_costs)
+        self.avg_vol_cost += eps
+        self.accept_rate = sum(valids) / len(valids)
+
+        self.sol = deepcopy(temp_sol)
+        self._compute_cost()
+        self._keep_prev()
+        self._keep_best()
+        print('Init done')
 
     def _perturb(self, init=False):
+        # TODO: perturb different dimensions based on failure from last solution?
+
         r = random.randint(0, len(ranges)- 1) # lol randint is inclusive on end idx for some reason
         rmin = (ranges[r]['max'] - ranges[r]['min']) * 0.05 # TODO: shud depend on temperature
         rmax = (ranges[r]['max'] - ranges[r]['min']) * 0.10 # TODO: shud depend on temperature
@@ -111,22 +168,31 @@ class SimulatedAnnealing:
         self.sol.params[r] = int(self.sol.params[r])
 
     def _is_valid(self):
-        if not self.sol.packing.evaluated:
-            self.sol.packing.pack()
-        pack_valid = self.sol.packing.feasible
+        if not self.sol.pack.evaluated:
+            self.sol.pack.pack()
+        pack_valid = self.sol.pack.feasible
+        buoy_valid = self.sol.pack.net_in_water_weight <= 0
         df_valid = self.sol.df <= df_threshold
-        self.sol.valid = pack_valid and df_valid
+        # TODO: update success rate?
+        if not pack_valid: pass
+        if not buoy_valid: pass
+        if not df_valid: pass
+        self.sol.valid = pack_valid and buoy_valid and df_valid
         return self.sol.valid
 
-    def _packing_cost(self): # TODO this should be normalized / more dynamic
-        if not self.sol.packing.evaluated:
-            self.sol.packing.pack()
-        return self.sol.packing.loss
+    def _pack_cost(self): # TODO this should be normalized / more dynamic
+        if not self.sol.pack.evaluated:
+            self.sol.pack.pack()
+        return self.sol.pack.loss
 
-    def _df_cost(self):
+    def _buoy_cost(self): # TODO: need normalize
+        assert self.sol.pack.evaluated
+        in_water_weight = self.sol.pack.net_in_water_weight
+        return in_water_weight if in_water_weight > 0 else 0
+
+    def _df_cost(self): # TODO: need normalize
         val = max(self.sol.df - df_threshold, 0)
         return val
-
 
     def _keep_best(self):
         self.best_sol = deepcopy(self.sol)
@@ -150,17 +216,26 @@ class SimulatedAnnealing:
         self.sol.area = area
 
         # TODO: normalize cost
-        packing_cost = self._packing_cost()
-        packing_cost_normalized = packing_cost
+        self.sol.pack = packing_problem(self.sol)
+        pack_cost = self._pack_cost()
+        pack_cost_normalized = pack_cost / self.avg_pack_cost
+        buoy_cost = self._buoy_cost()
+        buoy_cost_normalized = buoy_cost / self.avg_buoy_cost
         df_cost = self._df_cost()
-        df_cost_normalized = df_cost
+        df_cost_normalized = df_cost / self.avg_df_cost
+        vol_cost = vol
+        vol_cost_normalized = vol_cost / self.avg_vol_cost
+        # print(pack_cost_normalized, buoy_cost_normalized, df_cost_normalized, vol_cost_normalized)
 
-        true_cost = self.sol.vol
-        cost = self.alpha * packing_cost_normalized + (1-self.alpha) * df_cost_normalized
-        cost = self.beta * true_cost + (1-self.beta) * cost
+        true_cost = vol_cost_normalized
+        # TODO: can do some weighting
+        feasible_cost = (pack_cost_normalized + df_cost_normalized + buoy_cost_normalized) / 3
+        cost = self.beta * true_cost + (1-self.beta) * feasible_cost
 
         self.sol.cost = cost
         self.sol.true_cost = true_cost
+
+        self._update_avg(pack_cost, buoy_cost, df_cost, vol_cost)
 
         return cost , true_cost # TODO implement hard enforcement
 
@@ -173,12 +248,41 @@ class SimulatedAnnealing:
         area = parse_area()
         return df, vol, area
 
+    def _update_avg(self, pack_cost, buoy_cost, df_cost, vol_cost):
+        assert self.avg_pack_cost is not None
+        assert self.avg_buoy_cost is not None
+        assert self.avg_df_cost is not None
+        self.avg_pack_cost = (self.avg_pack_cost * (self.rand_n-1) + pack_cost) / self.rand_n
+        self.avg_buoy_cost = (self.avg_buoy_cost * (self.rand_n-1) + buoy_cost) / self.rand_n
+        self.avg_df_cost = (self.avg_df_cost * (self.rand_n-1) + df_cost) / self.rand_n
+        self.avg_vol_cost = (self.avg_vol_cost * (self.rand_n-1) + vol_cost) / self.rand_n
 
-    def _get_temperature(self, it):
-        return 0 if not it else self.n_iter / it   # TODO bruh
 
-    def _get_prob(self, t):
-        return .05 #TODO dynamic
+    def _get_temperature(self, it, scheduling_method='classic'):
+        # constants
+        lmbda = 0.85
+        lmbda_lb = 0.8
+        lmbda_ub = 0.95
+        c = 5
+
+        new_t = None
+        if it == 1:
+            new_t = 1e5 / (-math.log(self.accept_rate + 1e-3)) # TODO: change this
+            self.T1 = new_t
+        elif scheduling_method == 'classic':
+            new_t = self.t * lmbda
+        elif scheduling_method == 'timberwolf':
+            if it < self.iter / 2:
+                new_t = lmbda_lb + (it - 1) / (self.iter / 2) * (lmbda_ub - lmbda_lb)
+            if it >= self.iter / 2:
+                new_t = lmbda_ub - (it - self.iter / 2) / (self.iter / 2) * (lmbda_ub - lmbda_lb)
+            new_t = self.t * lmbda
+        elif scheduling_method == 'fast':
+            if it <= num_local_search_iter:
+                new_t = self.T1 * self.avg_delta_cost / it / c
+            else:
+                new_t = self.T1 * self.avg_delta_cost / it
+        return new_t
 
 
 if __name__ == '__main__':
