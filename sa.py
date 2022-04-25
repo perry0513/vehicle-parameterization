@@ -57,12 +57,14 @@ class SimulatedAnnealing:
         for i in range(1, self.n_iter+1):
             self.t = self._get_temperature(i)
             self.avg_delta_cost = 0
+            # print(self.t)
             for j in range(self.inner_iter):
                 self._perturb()
                 cost, true_cost = self._compute_cost()
                 valid = self._is_valid()
                 delta_cost = self.sol.cost - self.prev_sol.cost
                 accept_p = min(1.0, math.exp(-delta_cost / self.t))
+                # print(accept_p)
 
                 self.avg_delta_cost += abs(delta_cost)
 
@@ -96,6 +98,7 @@ class SimulatedAnnealing:
                     print(f'> best valid df       : {self.best_valid_sol.df}')
                 else:
                     print('> best valid solution : None')
+                print()
 
             self.avg_delta_cost /= self.inner_iter
 
@@ -103,6 +106,7 @@ class SimulatedAnnealing:
 
 
     def _init(self):
+        print('Init start')
         temp_sol = deepcopy(self.sol)
         pack_costs = []
         buoy_costs = []
@@ -173,6 +177,7 @@ class SimulatedAnnealing:
         pack_valid = self.sol.pack.feasible
         buoy_valid = self.sol.pack.net_in_water_weight <= 0
         df_valid = self.sol.df <= df_threshold
+        # print(self.sol.pack.net_in_water_weight)
         # TODO: update success rate?
         if not pack_valid: pass
         if not buoy_valid: pass

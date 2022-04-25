@@ -11,18 +11,19 @@ water_density = 1027 # kg/m^3
 
 payload_x = 1000 # mm
 payload_y = 1000 # mm
-payload_z = 300 # mm
+payload_z = 250 # mm
 payload_vol = payload_x * payload_y * payload_z * 1e-9 # m^3
-payload_density = 2810 # kg/m^3
-payload_mass = payload_vol * payload_density # kg
-payload_buoy = payload_vol * water_density # kg
-payload_in_water_weight = payload_mass - payload_buoy # kg
+# payload_density = 2810 # kg/m^3
+# payload_mass = payload_vol * payload_density # kg
+# payload_buoy = payload_vol * water_density # kg
+# payload_in_water_weight = payload_mass - payload_buoy # kg
+payload_in_water_weight = -46 # kg
 
 bat_energy_density_per_vol = 370 # kWh/m^3
 bat_density = 1446 # kg/m^3
 PV_density = 3950 # kg/m^3
 PV_thickness = 0.026 # m
-fairing_thickness = 0.0127 # m
+fairing_thickness = 0.0254 / 2 # m
 fairing_density = 1465 # kg/m^3
 float_density = 465 # kg/m^3
 
@@ -41,7 +42,7 @@ class packing_problem:
         length = params[0] * 1e-3 # m
         vehicle_vol = params[0] * params[1] * params[2] * 1e-9 # m^3
         _fairing_area = self.sol.area
-        fairing_vol = self.sol.vol
+        _fairing_vol = self.sol.vol
 
         # Assume batteries and pressure vessels are rectangles
 
@@ -63,9 +64,10 @@ class packing_problem:
 
 
         fairing_area = _fairing_area * 1e-6 # m^2
+        fairing_vol = _fairing_vol * 1e-9 # m^2
         fairing_disp_vol = fairing_area * fairing_thickness # m^3
-        fairing_mass = fairing_vol * fairing_density # kg
-        fairing_buoy = fairing_vol * water_density # kg
+        fairing_mass = fairing_disp_vol * fairing_density # kg
+        fairing_buoy = fairing_disp_vol * water_density # kg
         fairing_in_water_weight = fairing_mass - fairing_buoy # kg
 
         total_in_water_weight = bat_mass + PV_in_water_weight + fairing_in_water_weight + payload_in_water_weight # kg
@@ -73,6 +75,11 @@ class packing_problem:
 
         float_vol = total_in_water_weight / (water_density - float_density) # m^3
         spare_vol = vehicle_vol - fairing_disp_vol - PV_disp_vol - payload_vol # m^3
+        # print('float_vol:', float_vol)
+        # print('spare_vol:', spare_vol)
+        # print('total_in_water_weight:', total_in_water_weight)
+        # print('float:', spare_vol * (water_density - float_density))
+        # import IPython; IPython.embed()
         is_neutrally_buoyant = spare_vol > float_vol
         self.net_in_water_weight = total_in_water_weight - spare_vol * (water_density - float_density) # kg
 
