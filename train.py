@@ -1,61 +1,88 @@
+import os 
+import pandas as pd
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from sklearn.preprocessing import StandardScaler
 
-import pandas as pd
-from net import Net
+from surrogates.dataset import createDataset
+from surrogates.net import Net
 
-class Dataset(torch.utils.data.Dataset):
+DATA_PATH = os.path.join('surrogates', 'result.csv')
+MODEL_PATH = os.path.join('surrogates', 'model.pt')
 
-  def __init__(self, X, y, scale_data=True):
-    if not torch.is_tensor(X) and not torch.is_tensor(y):
-      # Apply scaling if necessary
-      if scale_data:
-          X = StandardScaler().fit_transform(X)
-      self.X = torch.Tensor(X)
-      self.y = torch.Tensor(y)
+'''
+2-layered NN + MSE loss
+ - hidden_size=30 => test loss=455.2901
+ - hidden_size=40 => test loss=446.6851
+ - hidden_size=50 => test loss=444.3011
 
-  def __len__(self):
-      return len(self.X)
-
-  def __getitem__(self, i):
-      return self.X[i], self.y[i]
-
-def createDataset(csv_file):
-    df = pd.read_csv(csv_file)
-    X = []
-    y = []
-    for i, row in df.iterrows():
-        row = list(row[1:])
-        X.append(row[:7])
-        y.append([row[7]])
-    return Dataset(X, y)
+3-layered NN + MSE loss
+ - hidden_size=30 => test loss=455.2501
+ - hidden_size=40 => test loss=458.7501
+ - hidden_size=50 => test loss=447.5958
+'''
 
 if __name__ == '__main__':
-    model = Net()
 
-    dataset = createDataset('result.csv')
-    trainloader = torch.utils.data.DataLoader(dataset, batch_size=10, shuffle=True, num_workers=0)
+    # seeding
+    seed = 0
+    torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-    epochs = 50
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    train_dataset, test_dataset = createDataset(DATA_PATH, seed=seed)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1000, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1000)
 
+    epochs = 2000
+    criterion = nn.MSELoss() # nn.SmoothL1Loss() 
+    net = Net().cuda()
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    best_mse = float('inf')
     for i in range(epochs):
-        l = 0
-        for input, target in trainloader:
+        training_loss, test_loss = 0, 0
+        training_mse, test_mse = 0, 0
+        training_mae, test_mae = 0, 0
+        net.train()
+        for input, target in train_loader:
+            target = target.cuda()
+            pred = net(input.cuda())
+            loss = criterion(pred, target)
 
-            optimizer.zero_grad()   # zero the gradient buffers
-            output = model(input)
-            loss = criterion(output, target)
+            optimizer.zero_grad()
             loss.backward()
-            optimizer.step()    # Does the update
+            optimizer.step()    
 
-            l += loss.item()
-            # print(loss.item())
-        print(f'Epoch {i} loss: {l/500}')
+            training_loss += loss.item()
+            training_mse += F.mse_loss(pred, target, reduction='sum').item()
+            training_mae += F.smooth_l1_loss(pred, target, reduction='sum').item()
+            # if i % 200 == 0:
+            #     print(training_loss)
 
-    torch.save(model.state_dict(), 'model.pt')
-            
+        net.eval()
+        for input, target in test_loader:
+            target = target.cuda()
+            with torch.no_grad():
+                pred = net(input.cuda())
+            test_loss += criterion(net(input.cuda()), target.cuda()).item()
+            test_mse += F.mse_loss(pred, target, reduction='sum').item()
+            test_mae += F.smooth_l1_loss(pred, target, reduction='sum').item()
+
+        # if i % 100 == 0:
+        #     print(net(input.cuda()).detach().cpu()[:10], '\n', target.detach().cpu()[:10])
+
+        training_mse, training_mae = training_mse / len(train_dataset), training_mae / len(train_dataset)
+        test_mse, test_mae = test_mse / len(test_dataset), test_mae / len(test_dataset)
+
+        if i % 100 == 0:
+            print(f'Epoch {i:5d} | train/test mse: {training_mse:.4f}/{test_mse:.4f} | ' + 
+                f'train/test mae: {training_mae:.4f}/{test_mae:.4f}')
+        
+        if test_mse <= best_mse:
+            torch.save(net.state_dict(), MODEL_PATH)
+            best_mse = test_mse
+
+
+

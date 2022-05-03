@@ -1,3 +1,4 @@
+import os
 import sys
 import torch
 import torch.nn as nn
@@ -6,23 +7,24 @@ import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
 
 import pandas as pd
-from net import Net
+from surrogates.net import Net
 import numpy as np
 
 SS_MEAN = [2493.7060225 , 1217.44478049, 1217.61054739, 2429.59505593, 333.79507274, 2491.11564464, 55.26044223]
-SS_STD = [864.40737069, 467.49305073, 461.33622201, 864.5522074 ,
-       128.54888658, 834.28007298,  25.73341932]
+SS_STD = [864.40737069, 467.49305073, 461.33622201, 864.5522074,
+       128.54888658, 834.28007298, 25.73341932]
+MODEL_PATH = os.path.join('surrogates', 'model.pt')
 
 model = Net()
-model.load_state_dict(torch.load('model.pt'))
+model.load_state_dict(torch.load(MODEL_PATH, map_location='cpu'))
 model.eval()
 
 def infer(args):
     scaler = StandardScaler()
     scaler.mean_ = np.array(SS_MEAN)
     scaler.scale_ = np.array(SS_STD)
-    args_scaled = scaler.transform(np.array(args).reshape(1,-1))
-    args_scaled = torch.Tensor(args_scaled)
+    args_scaled = scaler.transform(np.array(args).reshape(1, -1))
+    args_scaled = torch.FloatTensor(args_scaled)
     # model = Net()
     # model.load_state_dict(torch.load('model.pt'))
     # model.eval()
