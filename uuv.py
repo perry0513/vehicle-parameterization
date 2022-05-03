@@ -109,7 +109,7 @@ class packing_problem:
         inz = z * 0.1
 #         print(self.sol.params)
         while len(packer.bins[0].unfitted_items) != 0:
-            # loss += 1
+            loss += 1
             x += inx
             packer.bins[0] = Bin('main-cabin', x,y,z, 10)
             packer.pack()
@@ -132,6 +132,7 @@ class packing_problem:
                 break
             x += inx
             y += iny
+            loss += 1 # penalty of 2 if you have to scale all of them
             packer.bins[0] = Bin('main-cabin', x,y,z, 10)
             packer.pack()
             if len(packer.bins[0].unfitted_items) == 0:
