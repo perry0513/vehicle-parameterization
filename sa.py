@@ -34,6 +34,7 @@ class Solution:
 
 
 class SimulatedAnnealing:
+    eps = 0.001
     def __init__(self, sol, n_iter):
         self.n_iter = n_iter
         self.inner_iter = 5
@@ -54,22 +55,29 @@ class SimulatedAnnealing:
     def run(self):
         self._init()
         cost, true_cost = 0.0, 0.0
+        pvalid = False
         for i in range(1, self.n_iter+1):
+
             self.t = self._get_temperature(i)
             self.avg_delta_cost = 0
             # print(self.t)
             for j in range(self.inner_iter):
-                self._perturb()
                 cost, true_cost = self._compute_cost()
                 valid = self._is_valid()
                 delta_cost = self.sol.cost - self.prev_sol.cost
                 accept_p = min(1.0, math.exp(-delta_cost / self.t))
                 # print(accept_p)
+                if pvalid and not valid and random.random() < 1- accept_p : # change the thing that made it fail with probability 1- accept_p, we want to force valid closer to end of SA
+                    perturbed_idx = self._perturb(idx=perturbed_idx)
+                else:
+                    perturbed_idx = self._perturb()
 
                 self.avg_delta_cost += abs(delta_cost)
+              #  print(self.sol.params)
 
                 if self.best_valid_sol is None and valid:
                     self._keep_best_valid()
+              #  print(cost, self.best_sol.cost)
 
                 if cost < self.best_sol.cost or random.random() < accept_p:
                     self._keep_prev()
@@ -79,10 +87,12 @@ class SimulatedAnnealing:
                         self._keep_best_valid()
                 else:
                     self._restore_prev()
+                pvalid = valid
 
             self._restore_best()
             if i % 1 == 0:
                 print(f'---- Iter {i} ----')
+                print(f'> avg delta cost: {self.avg_delta_cost}')
                 print(f'> best params   : {self.sol.params}')
                 print(f'> best cost     : {self.sol.cost}')
                 print(f'> best true_cost: {self.sol.true_cost}')
@@ -153,10 +163,13 @@ class SimulatedAnnealing:
         self._keep_best()
         print('Init done')
 
-    def _perturb(self, init=False):
+    def _perturb(self, init=False, idx=-1):
         # TODO: perturb different dimensions based on failure from last solution?
 
-        r = random.randint(0, len(ranges)- 1) # lol randint is inclusive on end idx for some reason
+        if idx == -1:
+            r = random.randint(0, len(ranges)- 1) # lol randint is inclusive on end idx for some reason
+        else:
+            r = idx
         rmin = (ranges[r]['max'] - ranges[r]['min']) * 0.05 # TODO: shud depend on temperature
         rmax = (ranges[r]['max'] - ranges[r]['min']) * 0.10 # TODO: shud depend on temperature
         delta = rmin + (rmax - rmin) * random.random()
@@ -170,6 +183,7 @@ class SimulatedAnnealing:
         if min_dim / 2 <= self.sol.params[4]:
             self.sol.params[4] = int((min_dim-1) / 2)
         self.sol.params[r] = int(self.sol.params[r])
+        return r
 
     def _is_valid(self):
         if not self.sol.pack.evaluated:
@@ -198,6 +212,7 @@ class SimulatedAnnealing:
     def _df_cost(self): # TODO: need normalize
         val = max(self.sol.df - df_threshold, 0)
         return val
+        #return abs(self.sol.df)
 
     def _keep_best(self):
         self.best_sol = deepcopy(self.sol)
