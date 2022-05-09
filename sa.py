@@ -158,7 +158,7 @@ class SimulatedAnnealing:
             valids.append(valid)
 
         # import IPython; IPython.embed()
-        eps = 1e-4
+        eps = 1
         self.avg_pack_cost = sum(pack_costs) / len(pack_costs)
         self.avg_pack_cost += eps
         self.avg_buoy_cost = sum(buoy_costs) / len(buoy_costs)
@@ -178,14 +178,14 @@ class SimulatedAnnealing:
     def _perturb(self, init=False, idx=-1):
         # TODO: perturb different dimensions based on failure from last solution?
 
-        if idx == -1:
-            r = random.randint(0, len(ranges)- 1) # lol randint is inclusive on end idx for some reason
-        else:
+        if idx != -1 and random.random() < 0.8:
             r = idx
+        else:
+            r = random.randint(0, len(ranges)- 1) # lol randint is inclusive on end idx for some reason
         rmin = (ranges[r]['max'] - ranges[r]['min']) * 0.05 # TODO: shud depend on temperature
         rmax = (ranges[r]['max'] - ranges[r]['min']) * 0.10 # TODO: shud depend on temperature
         delta = rmin + (rmax - rmin) * random.random()
-        self.sol.params[r] += delta * (1 if random.random() < 0.5 else -1)
+        self.sol.params[r] += delta * (1 if random.random() < 0.3 else -1)
 
         self.sol.params[r] = min(self.sol.params[r], ranges[r]['max'])
         self.sol.params[r] = max(self.sol.params[r], ranges[r]['min'])
