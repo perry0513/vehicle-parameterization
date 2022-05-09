@@ -39,7 +39,6 @@ class Solution:
 
 class SimulatedAnnealing:
     def __init__(self, sol, n_iter, json_name, sched_method='classic'):
-        print(sched_method)
         self.json_name = json_name
         self.n_iter = n_iter
         self.inner_iter = 5
@@ -73,14 +72,14 @@ class SimulatedAnnealing:
             success_rate = 0
             for j in range(self.inner_iter):
                 self.log.append([self.t, success_rate, avg_accept_p, self.avg_delta_cost, self.sol.cost, self.sol.true_cost, self.sol.valid, self.sol.df])
-                cost, true_cost = self._compute_cost()
-                valid = self._is_valid()
-                delta_cost = self.sol.cost - self.prev_sol.cost
-                self.accept_p = min(1.0, math.exp(-delta_cost / self.t))
                 if pvalid and not valid and random.random() < 1 - self.accept_p : # change the thing that made it fail with probability 1- accept_p, we want to force valid closer to end of SA
                     perturbed_idx = self._perturb(idx=perturbed_idx)
                 else:
                     perturbed_idx = self._perturb()
+                cost, true_cost = self._compute_cost()
+                valid = self._is_valid()
+                delta_cost = self.sol.cost - self.prev_sol.cost
+                self.accept_p = min(1.0, math.exp(-delta_cost / self.t))
 
                 self.avg_delta_cost += abs(delta_cost)
 
@@ -382,7 +381,7 @@ def main(args):
     #     args = [int(arg) for arg in sys.argv[1:]]
     params = parse_json(FLAGS.json)
     sol = Solution(params)
-    niters = 3
+    niters = 50
     sa = SimulatedAnnealing(sol, niters, FLAGS.json, FLAGS.sched)
     sa.run()
     if FLAGS.log:
