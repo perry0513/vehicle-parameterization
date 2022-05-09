@@ -61,18 +61,23 @@ class SimulatedAnnealing:
             self.t = self._get_temperature(i)
             self.avg_delta_cost = 0
             # print(self.t)
+            a = []
             for j in range(self.inner_iter):
                 cost, true_cost = self._compute_cost()
                 valid = self._is_valid()
                 delta_cost = self.sol.cost - self.prev_sol.cost
                 accept_p = min(1.0, math.exp(-delta_cost / self.t))
                 # print(accept_p)
-                if pvalid and not valid and random.random() < 1- accept_p : # change the thing that made it fail with probability 1- accept_p, we want to force valid closer to end of SA
-                    perturbed_idx = self._perturb(idx=perturbed_idx)
-                else:
-                    perturbed_idx = self._perturb()
+#                if pvalid and not valid and random.random() < 1- accept_p : # change the thing that made it fail with probability 1- accept_p, we want to force valid closer to end of SA
+#                    perturbed_idx = self._perturb(idx=perturbed_idx)
+#                else:
+                perturbed_idx = self._perturb()
 
                 self.avg_delta_cost += abs(delta_cost)
+                if valid:
+                    a.append(cost)
+                else:
+                    a.append(self.prev_sol.cost)
               #  print(self.sol.params)
 
                 if self.best_valid_sol is None and valid:
@@ -111,7 +116,14 @@ class SimulatedAnnealing:
                 print()
 
             self.avg_delta_cost /= self.inner_iter
+        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        plt.plot(a)
+        fig.savefig('temp.png', dpi=fig.dpi)
 
+        print(self.best_valid_sol)
+        with open("outfile.txt", "w") as f:
+            f.writelines(" ".join([str(i) for i in self.best_valid_sol]))
         return self.best_valid_sol
 
 
