@@ -31,6 +31,8 @@ class Solution:
         self.valid = False
         self.cost = None
         self.true_cost = None
+        self.raw_cost = None
+        self.raw_true_cost = None
         self.df = None
         self.vol = None
         self.area = None
@@ -38,7 +40,8 @@ class Solution:
 
 
 class SimulatedAnnealing:
-    def __init__(self, sol, n_iter, json_name, sched_method='classic'):
+    def __init__(self, sol, n_iter, json_name, sched_method='classic', normalization="none"):
+        self.normalization = normalization
         self.json_name = json_name
         self.n_iter = n_iter
         self.inner_iter = 5
@@ -62,7 +65,7 @@ class SimulatedAnnealing:
 
     def run(self):
         self._init()
-        cost, true_cost = 0.0, 0.0
+        cost, true_cost, raw_cost, raw_true_cost = 0.0, 0.0, 0.0, 0.0
         pvalid = False
         for i in range(1, self.n_iter+1):
 
@@ -71,12 +74,11 @@ class SimulatedAnnealing:
             avg_accept_p = 0
             success_rate = 0
             for j in range(self.inner_iter):
-                self.log.append([self.t, success_rate, avg_accept_p, self.avg_delta_cost, self.sol.cost, self.sol.true_cost, self.sol.valid, self.sol.df])
                 if pvalid and not valid and random.random() < 1 - self.accept_p : # change the thing that made it fail with probability 1- accept_p, we want to force valid closer to end of SA
                     perturbed_idx = self._perturb(idx=perturbed_idx)
                 else:
                     perturbed_idx = self._perturb()
-                cost, true_cost = self._compute_cost()
+                cost, true_cost, raw_cost, raw_true_cost = self._compute_cost()
                 valid = self._is_valid()
                 delta_cost = self.sol.cost - self.prev_sol.cost
                 self.accept_p = min(1.0, math.exp(-delta_cost / self.t))
@@ -85,12 +87,17 @@ class SimulatedAnnealing:
 
                 if self.best_valid_sol is None and valid:
                     self._keep_best_valid()
-
-                if cost < self.best_sol.cost or random.random() < self.accept_p:
+                if self.normalization == "none":
+                    better = cost < self.best_sol.cost
+                    true_cost_better = true_cost < self.best_valid_sol.true_cost
+                else:
+                    better = cost < 1
+                    true_cost_better = true_cost < 1
+                if better or random.random() < self.accept_p:
                     self._keep_prev()
-                    if cost < self.best_sol.cost:
+                    if better:
                         self._keep_best()
-                    if valid and true_cost < self.best_valid_sol.true_cost:
+                    if valid and true_cost_better:
                         self._keep_best_valid()
                 else:
                     self._restore_prev()
@@ -104,6 +111,7 @@ class SimulatedAnnealing:
             success_rate /= self.inner_iter
 
             self._restore_best()
+            self.log.append([self.t, success_rate, avg_accept_p, self.avg_delta_cost, self.sol.cost,self.sol.raw_cost, self.sol.true_cost, self.sol.raw_true_cost, self.sol.valid, self.sol.df])
             if i % 1 == 0:
                 print(f'---- Iter {i} ----')
                 print(f'> temperature   : {self.t}')
@@ -112,6 +120,7 @@ class SimulatedAnnealing:
                 print(f'> avg delta cost: {self.avg_delta_cost}')
                 print(f'> best params   : {self.sol.params}')
                 print(f'> best cost     : {self.sol.cost}')
+                print(f'> best cost(raw): {self.sol.raw_cost}')
                 print(f'> best true_cost: {self.sol.true_cost}')
                 print(f'> best is_valid : {self.sol.valid}')
                 print(f'> best placement: {self.sol.pack.items}')
@@ -274,33 +283,48 @@ class SimulatedAnnealing:
         self.sol.vol = vol
         self.sol.area = area
 
-        # TODO: normalize cost
         self.sol.pack = packing_problem(self.sol)
         pack_cost = self._pack_cost()
-        pack_cost_normalized = pack_cost / self.avg_pack_cost
         buoy_cost = self._buoy_cost()
-        buoy_cost_normalized = buoy_cost / self.avg_buoy_cost
         df_cost = self._df_cost()
-        df_cost_normalized = df_cost / self.avg_df_cost
         vol_cost = vol
-        vol_cost_normalized = vol_cost / self.avg_vol_cost
+        if self.normalization == "best_valid" and self.best_valid_sol is not None:
+            pack_cost_normalized = pack_cost / self.avg_pack_cost
+            buoy_cost_normalized = buoy_cost / self.avg_buoy_cost
+            df_cost_normalized = df_cost / self.avg_df_cost
+            vol_cost_normalized = vol_cost / self.avg_vol_cost
+        elif self.normalization == "rolling_avg":
+            pack_cost_normalized = pack_cost / self.avg_pack_cost
+            buoy_cost_normalized = buoy_cost / self.avg_buoy_cost
+            df_cost_normalized = df_cost / self.avg_df_cost
+            vol_cost_normalized = vol_cost / self.avg_vol_cost
+        elif self.normalization == "none" or self.best_valid_sol is None:
+            pack_cost_normalized = pack_cost
+            buoy_cost_normalized = buoy_cost
+            df_cost_normalized = df_cost
+            vol_cost_normalized = vol_cost
         # print(pack_cost_normalized, buoy_cost_normalized, df_cost_normalized, vol_cost_normalized)
 
         cost, true_cost = self._cost_fun(pack_cost_normalized, buoy_cost_normalized, df_cost_normalized, vol_cost_normalized)
+        raw_cost, raw_true_cost = self._cost_fun(pack_cost, buoy_cost, df_cost, vol_cost)
 
         self.sol.cost = cost
         self.sol.true_cost = true_cost
+        self.sol.raw_cost = raw_cost
+        self.sol.raw_true_cost = raw_true_cost
 
-        # self._update_avg(pack_cost, buoy_cost, df_cost, vol_cost)
-
-        return cost , true_cost # TODO implement hard enforcement
+        self._update_avg(pack_cost, buoy_cost, df_cost, vol_cost)
+        return cost , true_cost, raw_cost, raw_true_cost# TODO implement hard enforcement
 
     def _cost_fun(self, pack_cost_norm, buoy_cost_norm, df_cost_norm, vol_cost_norm):
         true_cost = vol_cost_norm
         # TODO: can do some weighting
         feasible_cost = (pack_cost_norm + df_cost_norm + buoy_cost_norm) / 3
         cost = self.true_cost_w * true_cost + (1-self.true_cost_w) * feasible_cost
-        return cost, true_cost
+        if self.normalization == "none" or self.best_valid_sol is None: # deals with overflow
+            return math.log10(cost), math.log10(true_cost)
+        else:
+            return cost , true_cost
 
     def _evaluate(self, sol):
         p = sol.params
@@ -358,12 +382,12 @@ class SimulatedAnnealing:
     def write(self):
         if not os.path.exists("logs/"):
             os.mkdir("logs/")
-        with open(f"logs/{self.json_name}_{self.sched_method}_{self.n_iter}_iters_log.csv", 'w') as log_file:
+        with open(f"logs/{self.json_name}_{self.sched_method}_scheduling_{self.normalization}_normalization_{self.n_iter}_iters_log.csv", 'w') as log_file:
             output = csv.writer(log_file) # TODO add cost normalization method
-            output.writerow(["temp", "success_rate", "svg_accept_p", "avg_delta_cost", "cost", "true_cost", "valid", "drag force"])
+            output.writerow(["temp", "success_rate", "svg_accept_p", "avg_delta_cost", "cost", "raw_cost","true_cost","raw_true_cost", "valid", "drag_force"])
             for line in self.log:
                 output.writerow(line)
-        with open(f"logs/{self.json_name}_{self.sched_method}_{self.n_iter}_iters_assignment.csv", 'w') as results_file:
+        with open(f"logs/{self.json_name}_{self.sched_method}_scheduling_{self.normalization}_normalization_{self.n_iter}_iters_results.csv", 'w') as results_file:
             output = csv.writer(results_file) # TODO add cost normalization method
             output.writerow(["length", "width", "height", "noseLength", "radius", "tailLength", "endRadius"])
             output.writerow(self.best_valid_sol.params)
@@ -381,8 +405,8 @@ def main(args):
     #     args = [int(arg) for arg in sys.argv[1:]]
     params = parse_json(FLAGS.json)
     sol = Solution(params)
-    niters = 50
-    sa = SimulatedAnnealing(sol, niters, FLAGS.json, FLAGS.sched)
+    niters = 10
+    sa = SimulatedAnnealing(sol, niters, FLAGS.json, FLAGS.sched, FLAGS.norm)
     sa.run()
     if FLAGS.log:
         sa.write()
@@ -395,6 +419,12 @@ if __name__ == '__main__':
             'classic',
             ['classic', 'timberwolf', 'fast'],
             'temperature scheduling method for SA',
+            )
+    flags.DEFINE_enum(
+            'norm',
+            'none',
+            ['none', 'rolling_avg', 'best_valid'],
+            'cost normalization method for SA',
             )
     flags.DEFINE_boolean("log", False, "write out log and assignment")
     app.run(main)
