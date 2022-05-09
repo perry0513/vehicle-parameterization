@@ -1,6 +1,6 @@
 import math
+import json
 from py3dbp import Packer, Bin, Item
-import math
 
 df_threshold = 90
 energy_needed = 260 # kWh
@@ -75,11 +75,6 @@ class packing_problem:
 
         float_vol = total_in_water_weight / (water_density - float_density) # m^3
         spare_vol = vehicle_vol - fairing_disp_vol - PV_disp_vol - payload_vol # m^3
-        # print('float_vol:', float_vol)
-        # print('spare_vol:', spare_vol)
-        # print('total_in_water_weight:', total_in_water_weight)
-        # print('float:', spare_vol * (water_density - float_density))
-        # import IPython; IPython.embed()
         is_neutrally_buoyant = spare_vol > float_vol
         self.net_in_water_weight = total_in_water_weight - spare_vol * (water_density - float_density) # kg
 

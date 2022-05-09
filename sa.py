@@ -4,10 +4,14 @@ import random
 import subprocess
 import numpy as np
 from copy import deepcopy
+import argparse
+from absl import app, flags
+import csv
 
 from infer import infer
 from run_oracle import gen_stl, parse_volume, parse_area
 from uuv import *
+from helper import parse_json
 
 from py3dbp import Packer, Bin, Item
 
@@ -34,8 +38,9 @@ class Solution:
 
 
 class SimulatedAnnealing:
-    eps = 0.001
-    def __init__(self, sol, n_iter):
+    def __init__(self, sol, n_iter, json_name, sched_method='classic'):
+        print(sched_method)
+        self.json_name = json_name
         self.n_iter = n_iter
         self.inner_iter = 5
         self.sol = sol
@@ -43,7 +48,7 @@ class SimulatedAnnealing:
         self.best_sol = None
         self.best_valid_sol = None
         self.alpha = 0.5 # function of temperature
-        self.beta = 0.5 # function of temperature
+        self.true_cost_w = 0.6 # function of temperature
         self.avg_pack_cost = None
         self.avg_buoy_cost = None
         self.df_cost = None
@@ -51,6 +56,10 @@ class SimulatedAnnealing:
         self.rand_n = 10
         self.t = None
         self.T1 = None
+        self.conv_accept_p = 0.01
+        self.conv_cnt = 0
+        self.sched_method = sched_method
+        self.log = []
 
     def run(self):
         self._init()
@@ -58,33 +67,27 @@ class SimulatedAnnealing:
         pvalid = False
         for i in range(1, self.n_iter+1):
 
-            self.t = self._get_temperature(i)
+            self.t = self._get_temperature(i, self.sched_method)
             self.avg_delta_cost = 0
-            # print(self.t)
-            a = []
+            avg_accept_p = 0
+            success_rate = 0
             for j in range(self.inner_iter):
+                self.log.append([self.t, success_rate, avg_accept_p, self.avg_delta_cost, self.sol.cost, self.sol.true_cost, self.sol.valid, self.sol.df])
                 cost, true_cost = self._compute_cost()
                 valid = self._is_valid()
                 delta_cost = self.sol.cost - self.prev_sol.cost
-                accept_p = min(1.0, math.exp(-delta_cost / self.t))
-                # print(accept_p)
-#                if pvalid and not valid and random.random() < 1- accept_p : # change the thing that made it fail with probability 1- accept_p, we want to force valid closer to end of SA
-#                    perturbed_idx = self._perturb(idx=perturbed_idx)
-#                else:
-                perturbed_idx = self._perturb()
+                self.accept_p = min(1.0, math.exp(-delta_cost / self.t))
+                if pvalid and not valid and random.random() < 1 - self.accept_p : # change the thing that made it fail with probability 1- accept_p, we want to force valid closer to end of SA
+                    perturbed_idx = self._perturb(idx=perturbed_idx)
+                else:
+                    perturbed_idx = self._perturb()
 
                 self.avg_delta_cost += abs(delta_cost)
-                if valid:
-                    a.append(cost)
-                else:
-                    a.append(self.prev_sol.cost)
-              #  print(self.sol.params)
 
                 if self.best_valid_sol is None and valid:
                     self._keep_best_valid()
-              #  print(cost, self.best_sol.cost)
 
-                if cost < self.best_sol.cost or random.random() < accept_p:
+                if cost < self.best_sol.cost or random.random() < self.accept_p:
                     self._keep_prev()
                     if cost < self.best_sol.cost:
                         self._keep_best()
@@ -94,9 +97,19 @@ class SimulatedAnnealing:
                     self._restore_prev()
                 pvalid = valid
 
+                avg_accept_p += self.accept_p
+                success_rate += valid
+
+            self.avg_delta_cost /= self.inner_iter
+            avg_accept_p /= self.inner_iter
+            success_rate /= self.inner_iter
+
             self._restore_best()
             if i % 1 == 0:
                 print(f'---- Iter {i} ----')
+                print(f'> temperature   : {self.t}')
+                print(f'> success rate  : {success_rate}')
+                print(f'> avg accept p  : {avg_accept_p}')
                 print(f'> avg delta cost: {self.avg_delta_cost}')
                 print(f'> best params   : {self.sol.params}')
                 print(f'> best cost     : {self.sol.cost}')
@@ -111,19 +124,14 @@ class SimulatedAnnealing:
                     print(f'> best valid true_cost: {self.best_valid_sol.true_cost}')
                     print(f'> best valid placement: {self.best_valid_sol.pack.items}')
                     print(f'> best valid df       : {self.best_valid_sol.df}')
+                    print(f'> best valid vol      : {self.best_valid_sol.vol}')
                 else:
                     print('> best valid solution : None')
                 print()
 
-            self.avg_delta_cost /= self.inner_iter
-        import matplotlib.pyplot as plt
-        fig = plt.figure()
-        plt.plot(a)
-        fig.savefig('temp.png', dpi=fig.dpi)
+            if self._converged():
+                break
 
-        print(self.best_valid_sol)
-        with open("outfile.txt", "w") as f:
-            f.writelines(" ".join([str(i) for i in self.best_valid_sol]))
         return self.best_valid_sol
 
 
@@ -173,6 +181,26 @@ class SimulatedAnnealing:
         self._compute_cost()
         self._keep_prev()
         self._keep_best()
+
+        # uphill_cost = 0
+        # uphill_cnt = 0
+        # while uphill_cnt < 5:
+        #     self._perturb(init=True)
+
+        #     cost, true_cost = self._compute_cost()
+        #     if cost > self.prev_sol.cost:
+        #         uphill_cost += cost - self.prev_sol.cost
+        #         uphill_cnt += 1
+        #     else:
+        #         self._keep_best()
+
+        # self.avg_uphill_cost = uphill_cost / uphill_cnt
+        # print(self.avg_uphill_cost)
+
+        # self.sol = deepcopy(temp_sol)
+        # self._compute_cost()
+        # self._keep_prev()
+        # self._keep_best()
         print('Init done')
 
     def _perturb(self, init=False, idx=-1):
@@ -219,7 +247,7 @@ class SimulatedAnnealing:
     def _buoy_cost(self): # TODO: need normalize
         assert self.sol.pack.evaluated
         in_water_weight = self.sol.pack.net_in_water_weight
-        return in_water_weight if in_water_weight > 0 else 0
+        return in_water_weight / fairing_density if in_water_weight > 0 else 0
 
     def _df_cost(self): # TODO: need normalize
         val = max(self.sol.df - df_threshold, 0)
@@ -259,18 +287,21 @@ class SimulatedAnnealing:
         vol_cost_normalized = vol_cost / self.avg_vol_cost
         # print(pack_cost_normalized, buoy_cost_normalized, df_cost_normalized, vol_cost_normalized)
 
-        true_cost = vol_cost_normalized
-        # TODO: can do some weighting
-        feasible_cost = (pack_cost_normalized + df_cost_normalized + buoy_cost_normalized) / 3
-        cost = self.beta * true_cost + (1-self.beta) * feasible_cost
+        cost, true_cost = self._cost_fun(pack_cost_normalized, buoy_cost_normalized, df_cost_normalized, vol_cost_normalized)
 
         self.sol.cost = cost
         self.sol.true_cost = true_cost
 
-        self._update_avg(pack_cost, buoy_cost, df_cost, vol_cost)
+        # self._update_avg(pack_cost, buoy_cost, df_cost, vol_cost)
 
         return cost , true_cost # TODO implement hard enforcement
 
+    def _cost_fun(self, pack_cost_norm, buoy_cost_norm, df_cost_norm, vol_cost_norm):
+        true_cost = vol_cost_norm
+        # TODO: can do some weighting
+        feasible_cost = (pack_cost_norm + df_cost_norm + buoy_cost_norm) / 3
+        cost = self.true_cost_w * true_cost + (1-self.true_cost_w) * feasible_cost
+        return cost, true_cost
 
     def _evaluate(self, sol):
         p = sol.params
@@ -279,6 +310,13 @@ class SimulatedAnnealing:
         vol = parse_volume()
         area = parse_area()
         return df, vol, area
+
+    def _converged(self):
+        if self.accept_p < self.conv_accept_p:
+            self.conv_cnt += 1
+        else:
+            self.conv_cnt = 0
+        return self.conv_cnt >= 10
 
     def _update_avg(self, pack_cost, buoy_cost, df_cost, vol_cost):
         assert self.avg_pack_cost is not None
@@ -295,19 +333,22 @@ class SimulatedAnnealing:
         lmbda = 0.85
         lmbda_lb = 0.8
         lmbda_ub = 0.95
+        num_local_search_iter = 20
         c = 5
 
         new_t = None
         if it == 1:
-            new_t = 1e5 / (-math.log(self.accept_rate + 1e-3)) # TODO: change this
+            new_t = 1e2 / (-math.log(min(0.8, self.accept_rate + 1e-2))) # TODO: change this
+            # new_t = self.avg_uphill_cost / (-math.log(min(0.9, self.accept_rate + 1e-2))) # TODO: change this
+            # new_t = 0.1 / (-math.log(min(0.9, self.accept_rate + 1e-2))) # TODO: change this
             self.T1 = new_t
         elif scheduling_method == 'classic':
             new_t = self.t * lmbda
         elif scheduling_method == 'timberwolf':
-            if it < self.iter / 2:
-                new_t = lmbda_lb + (it - 1) / (self.iter / 2) * (lmbda_ub - lmbda_lb)
-            if it >= self.iter / 2:
-                new_t = lmbda_ub - (it - self.iter / 2) / (self.iter / 2) * (lmbda_ub - lmbda_lb)
+            if it < self.n_iter / 2:
+                lmbda = lmbda_lb + (it - 1) / (self.n_iter / 2) * (lmbda_ub - lmbda_lb)
+            if it >= self.n_iter / 2:
+                lmbda = lmbda_ub - (it - self.n_iter / 2) / (self.n_iter / 2) * (lmbda_ub - lmbda_lb)
             new_t = self.t * lmbda
         elif scheduling_method == 'fast':
             if it <= num_local_search_iter:
@@ -315,14 +356,46 @@ class SimulatedAnnealing:
             else:
                 new_t = self.T1 * self.avg_delta_cost / it
         return new_t
+    def write(self):
+        if not os.path.exists("logs/"):
+            os.mkdir("logs/")
+        with open(f"logs/{self.json_name}_{self.sched_method}_{self.n_iter}_iters_log.csv", 'w') as log_file:
+            output = csv.writer(log_file) # TODO add cost normalization method
+            output.writerow(["temp", "success_rate", "svg_accept_p", "avg_delta_cost", "cost", "true_cost", "valid", "drag force"])
+            for line in self.log:
+                output.writerow(line)
+        with open(f"logs/{self.json_name}_{self.sched_method}_{self.n_iter}_iters_assignment.csv", 'w') as results_file:
+            output = csv.writer(results_file) # TODO add cost normalization method
+            output.writerow(["length", "width", "height", "noseLength", "radius", "tailLength", "endRadius"])
+            output.writerow(self.best_valid_sol.params)
 
+
+
+
+
+
+def main(args):
+    # if len(sys.argv[1:]) != 7:
+    #     print('invalid number of arguments, defaulting...')
+    #     args = [int(i) for i in "50000 2000 2000 10 5 10 5".split()]
+    # else:
+    #     args = [int(arg) for arg in sys.argv[1:]]
+    params = parse_json(FLAGS.json)
+    sol = Solution(params)
+    niters = 3
+    sa = SimulatedAnnealing(sol, niters, FLAGS.json, FLAGS.sched)
+    sa.run()
+    if FLAGS.log:
+        sa.write()
 
 if __name__ == '__main__':
-    if len(sys.argv[1:]) != 7:
-        print('invalid number of arguments, defaulting...')
-        args = [int(i) for i in "50000 2000 2000 10 5 10 5".split()]
-    else:
-        args = [int(arg) for arg in sys.argv[1:]]
-    sol = Solution(args)
-    sa = SimulatedAnnealing(sol, 1000)
-    sa.run()
+    FLAGS = flags.FLAGS
+    flags.DEFINE_string('json', None, 'Input design (as json)')
+    flags.DEFINE_enum(
+            'sched',
+            'classic',
+            ['classic', 'timberwolf', 'fast'],
+            'temperature scheduling method for SA',
+            )
+    flags.DEFINE_boolean("log", False, "write out log and assignment")
+    app.run(main)
