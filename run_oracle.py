@@ -4,82 +4,14 @@ import sys
 import json
 from pathlib import Path
 import subprocess
+from helper import *
 
 use_cfd = True
 
 stl_dir = 'stl'
 Path(stl_dir).mkdir(parents=True, exist_ok=True)
-stl_log_filename = '.stl.log'
 cfd_log_filename = '.cfd.log'
 
-def gen_stl(length, width, height, noseLength, radius, tailLength, endRadius):
-    # Generate boxfish stl file
-    data = {
-            "type": "root",
-            "params": {"segments":128},
-            "children": [
-                {
-                    "type": "SingleHull",
-                    "params": {
-                        "length": length, #2400,
-                        "width": width, #700,
-                        "height": height, #700
-                        },
-                    "children": [
-                        {
-                            "type": "Front",
-                            "children": [
-                                {
-                                    "type": "LinearNoseCone",
-                                    "params": {
-                                        "noseLength": noseLength, #15
-                                        }
-                                    }
-                                ]
-                            },
-                        {
-                            "type": "Midsection",
-                            "children": [
-                                {
-                                    "type": "Midshape",
-                                    "children": [
-                                        {
-                                            "type": "Boxfish",
-                                            "params": 
-                                            {
-                                                "rounded": 1,
-                                                "radius": radius, #200
-                                                }
-                                            }
-                                        ]
-                                    }
-                                ]
-                            },
-                        {
-                            "type": "Tail",
-                            "children": [
-                                {
-                                    "type": "LinearTailCone",
-                                    "params": {
-                                        "tailLength": tailLength, #15,
-                                        "endRadius": endRadius, #100
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-
-    # stl_filename = f'{stl_dir}/boxfish_{length}_{width}_{height}_{noseLength}_{radius}_{tailLength}_{endRadius}.stl'
-    stl_filename = 'tmp.stl'
-    json_str = json.dumps(data, separators=(',',':'))
-    stl_cmd = f"npx jscad jscad-generator.js -o {stl_filename} --jsonComponentModel {json_str}"
-    # print(f'Execute command: {stl_cmd}')
-    with open(stl_log_filename, 'w') as outfile:
-        subprocess.run(stl_cmd.split(' '), stdout=outfile, stderr=outfile)
-    return stl_filename
 
 def run_cfd_sim(stl_filename, aoa=0):
     exe = "/Users/pwchen/code/LOGiCS/test_dexof/test_casestudy/run_dexof.sh"
