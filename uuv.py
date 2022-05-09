@@ -109,7 +109,7 @@ class packing_problem:
         inz = z * 0.1
 #         print(self.sol.params)
         while len(packer.bins[0].unfitted_items) != 0:
-            loss += 1
+            # loss += 1
             x += inx
             packer.bins[0] = Bin('main-cabin', x,y,z, 10)
             packer.pack()
@@ -132,14 +132,14 @@ class packing_problem:
                 break
             x += inx
             y += iny
-            loss += 1 # penalty of 2 if you have to scale all of them
+            # loss += 1 # penalty of 2 if you have to scale all of them
             packer.bins[0] = Bin('main-cabin', x,y,z, 10)
             packer.pack()
             if len(packer.bins[0].unfitted_items) == 0:
                 # print("new:", x, y, z)
                 break
 
-        loss = x * y * z - orig_x * orig_y * orig_z
+        loss = (x * y * z - orig_x * orig_y * orig_z) * 1e-9
         # self.feasible = is_neutrally_buoyant and len(packer.bins[0].unfitted_items) == 0
         self.feasible = loss == 0
         if self.feasible:
