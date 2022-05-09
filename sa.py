@@ -24,7 +24,6 @@ ranges = [
         {'min':1000, 'max':4000},
         {'min':10, 'max':100},
         ]
-
 class Solution:
     def __init__(self, params):
         self.params = params
@@ -90,7 +89,11 @@ class SimulatedAnnealing:
                 if self.normalization == "none":
                     better = cost < self.best_sol.cost
                     true_cost_better = true_cost < self.best_valid_sol.true_cost
-                else:
+                elif self.normalization == "best_valid":
+                    better = cost < 1
+                    true_cost_better = true_cost < 1
+                elif self.normalization == "rolling_avg":
+                    raise NotImplementedError("FIXME: rolling average normalization without re-normalizing the current best doesn't make sense!")
                     better = cost < 1
                     true_cost_better = true_cost < 1
                 if better or random.random() < self.accept_p:
