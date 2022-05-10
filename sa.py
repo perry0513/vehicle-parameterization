@@ -32,6 +32,10 @@ class Solution:
         self.true_cost = None
         self.raw_cost = None
         self.raw_true_cost = None
+        self.pack_cost = 1.0
+        self.buoy_cost = 1.0
+        self.df_cost = 1.0
+        self.vol_cost = 1.0
         self.df = None
         self.vol = None
         self.area = None
@@ -66,6 +70,8 @@ class SimulatedAnnealing:
         self._init()
         cost, true_cost, raw_cost, raw_true_cost = 0.0, 0.0, 0.0, 0.0
         pvalid = False
+        min_normalized = 1.0
+        min_normalized_true = 1.0
         for i in range(1, self.n_iter+1):
 
             self.t = self._get_temperature(i, self.sched_method)
@@ -90,8 +96,10 @@ class SimulatedAnnealing:
                     better = cost < self.best_sol.cost
                     true_cost_better = true_cost < self.best_valid_sol.true_cost
                 elif self.normalization == "best_valid":
-                    better = cost < 1
-                    true_cost_better = true_cost < 1
+                    better = cost < min_normalized
+                    true_cost_better = true_cost < min_normalized_true
+                    min_normalized = min(min_normalized, cost)
+                    min_normalized_true = min(min_normalized_true, true_cost)
                 elif self.normalization == "rolling_avg":
                     raise NotImplementedError("FIXME: rolling average normalization without re-normalizing the current best doesn't make sense!")
                     better = cost < 1
@@ -101,6 +109,8 @@ class SimulatedAnnealing:
                     if better:
                         self._keep_best()
                     if valid and true_cost_better:
+                        min_normalized = 1.0
+                        min_normalized_true = 1.0
                         self._keep_best_valid()
                 else:
                     self._restore_prev()
@@ -287,36 +297,36 @@ class SimulatedAnnealing:
         self.sol.area = area
 
         self.sol.pack = packing_problem(self.sol)
-        pack_cost = self._pack_cost()
-        buoy_cost = self._buoy_cost()
-        df_cost = self._df_cost()
-        vol_cost = vol
+        self.sol.pack_cost = self._pack_cost()
+        self.sol.buoy_cost = self._buoy_cost()
+        self.sol.df_cost = self._df_cost()
+        self.sol.vol_cost = vol
         if self.normalization == "best_valid" and self.best_valid_sol is not None:
-            pack_cost_normalized = pack_cost / self.avg_pack_cost
-            buoy_cost_normalized = buoy_cost / self.avg_buoy_cost
-            df_cost_normalized = df_cost / self.avg_df_cost
-            vol_cost_normalized = vol_cost / self.avg_vol_cost
+            pack_cost_normalized = self.sol.pack_cost / max(1, self.best_valid_sol.pack_cost)
+            buoy_cost_normalized = self.sol.buoy_cost / max(1, self.best_valid_sol.buoy_cost)
+            df_cost_normalized = self.sol.df_cost / max(1, self.best_valid_sol.df_cost) # is this ever under 1?
+            vol_cost_normalized = self.sol.vol_cost / max(1, self.best_valid_sol.vol_cost)
         elif self.normalization == "rolling_avg":
-            pack_cost_normalized = pack_cost / self.avg_pack_cost
-            buoy_cost_normalized = buoy_cost / self.avg_buoy_cost
-            df_cost_normalized = df_cost / self.avg_df_cost
-            vol_cost_normalized = vol_cost / self.avg_vol_cost
+            pack_cost_normalized = self.sol.pack_cost / self.avg_self.sol.pack_cost
+            buoy_cost_normalized = self.sol.buoy_cost / self.avg_buoy_cost
+            df_cost_normalized = self.sol.df_cost / self.avg_df_cost
+            vol_cost_normalized = self.sol.vol_cost / self.avg_vol_cost
         elif self.normalization == "none" or self.best_valid_sol is None:
-            pack_cost_normalized = pack_cost
-            buoy_cost_normalized = buoy_cost
-            df_cost_normalized = df_cost
-            vol_cost_normalized = vol_cost
-        # print(pack_cost_normalized, buoy_cost_normalized, df_cost_normalized, vol_cost_normalized)
+            pack_cost_normalized = self.sol.pack_cost
+            buoy_cost_normalized = self.sol.buoy_cost
+            df_cost_normalized = self.sol.df_cost
+            vol_cost_normalized = self.sol.vol_cost
+        # print(self.sol.pack_cost_normalized, buoy_cost_normalized, df_cost_normalized, vol_cost_normalized)
 
         cost, true_cost = self._cost_fun(pack_cost_normalized, buoy_cost_normalized, df_cost_normalized, vol_cost_normalized)
-        raw_cost, raw_true_cost = self._cost_fun(pack_cost, buoy_cost, df_cost, vol_cost)
+        raw_cost, raw_true_cost = self._cost_fun(self.sol.pack_cost, self.sol.buoy_cost, self.sol.df_cost, self.sol.vol_cost)
 
         self.sol.cost = cost
         self.sol.true_cost = true_cost
         self.sol.raw_cost = raw_cost
         self.sol.raw_true_cost = raw_true_cost
 
-        self._update_avg(pack_cost, buoy_cost, df_cost, vol_cost)
+        self._update_avg(self.sol.pack_cost, self.sol.buoy_cost, self.sol.df_cost, self.sol.vol_cost)
         return cost , true_cost, raw_cost, raw_true_cost# TODO implement hard enforcement
 
     def _cost_fun(self, pack_cost_norm, buoy_cost_norm, df_cost_norm, vol_cost_norm):
