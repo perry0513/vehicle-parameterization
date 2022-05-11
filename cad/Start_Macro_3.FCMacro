@@ -1,0 +1,80 @@
+# -*- coding: utf-8 -*-
+
+# Macro Begin: C:\Users\Vern\AppData\Roaming\FreeCAD\Macro\Start_Macro_3.FCMacro +++++++++++++++++++++++++++++++++++++++++++++++++
+import FreeCAD
+import PartDesign
+import PartDesignGui
+
+#These lines set the directory as a String, used in line 43 to save "Test_Macro_4.FCStd" to whatever directory this macro is in. Eli
+import os
+cwd = os.path.basename(__file__)
+directory =  __file__.replace(cwd, '')
+
+# Gui.runCommand('Std_DlgMacroRecord',0)
+### Begin command Std_New
+App.newDocument("Unnamed")
+# App.setActiveDocument("Unnamed")
+# App.ActiveDocument=App.getDocument("Unnamed")
+# Gui.ActiveDocument=Gui.getDocument("Unnamed")
+# Gui.activeDocument().activeView().viewDefaultOrientation()
+# Gui.ActiveDocument.ActiveView.setAxisCross(True)
+### End command Std_New
+### Begin command Std_Part
+App.activeDocument().Tip = App.activeDocument().addObject('App::Part','Part')
+App.activeDocument().Part.Label = 'Part'
+# Gui.activateView('Gui::View3DInventor', True)
+# Gui.activeView().setActiveObject('part', App.activeDocument().Part)
+App.ActiveDocument.recompute()
+### End command Std_Part
+### Begin command PartDesign_Body
+App.activeDocument().addObject('PartDesign::Body','Body')
+# Gui.activateView('Gui::View3DInventor', True)
+# Gui.activeView().setActiveObject('pdbody', App.activeDocument().Body)
+# Gui.Selection.clearSelection()
+# Gui.Selection.addSelection(App.ActiveDocument.Body)
+App.activeDocument().Part.addObject(App.ActiveDocument.Body)
+App.ActiveDocument.recompute()
+### End command PartDesign_Body
+# Gui.Selection.addSelection('Unnamed','Body')
+### Begin command Std_Save
+# Gui.SendMsgToActiveView("Save")
+
+### End command Std_Save
+
+#Gui.runCommand('PartDesign_NewSketch',0) #I commented out this line Eli
+#Gui.Selection.clearSelection()
+Gui.getDocument('Unnamed').ActiveView.setActiveObject('pdbody',App.getDocument('Unnamed').getObject('Part'),'Body.')
+# Gui.Selection.addSelection('Unnamed','Part','Body.Origin001.YZ_Plane001.')
+App.getDocument('Unnamed').getObject('Body').newObject('Sketcher::SketchObject','Sketch')
+App.getDocument('Unnamed').getObject('Sketch').Support = (App.getDocument('Unnamed').getObject('XY_Plane001'),[''])
+App.getDocument('Unnamed').getObject('Sketch').MapMode = 'FlatFace'
+App.ActiveDocument.recompute()
+Gui.getDocument('Unnamed').setEdit(App.getDocument('Unnamed').getObject('Body'),0,'Sketch.')
+ActiveSketch = App.getDocument('Unnamed').getObject('Sketch')
+tv = Show.TempoVis(App.ActiveDocument, tag= ActiveSketch.ViewObject.TypeId)
+ActiveSketch.ViewObject.TempoVis = tv
+if ActiveSketch.ViewObject.EditingWorkbench:
+  tv.activateWorkbench(ActiveSketch.ViewObject.EditingWorkbench)
+if ActiveSketch.ViewObject.HideDependent:
+  tv.hide(tv.get_all_dependent(App.getDocument('Unnamed').getObject('Body'), 'Sketch.'))
+if ActiveSketch.ViewObject.ShowSupport:
+  tv.show([ref[0] for ref in ActiveSketch.Support if not ref[0].isDerivedFrom("PartDesign::Plane")])
+if ActiveSketch.ViewObject.ShowLinks:
+  tv.show([ref[0] for ref in ActiveSketch.ExternalGeometry])
+tv.hide(ActiveSketch)
+del(tv)
+del(ActiveSketch)
+ 
+
+#App.getDocument("Unnamed").saveAs(directory + "Test_Macro_4.FCStd")
+#ActiveSketch = App.getDocument('Unnamed').getObject('Sketch')
+#if ActiveSketch.ViewObject.RestoreCamera:
+#  ActiveSketch.ViewObject.TempoVis.saveCamera()
+
+#Gui.activateWorkbench("SketcherWorkbench") # Added this line to change workbench to sketcher after the macro ended Eli
+#Gui.activeDocument().activeView().viewTop()# Sets view to Right for sketch
+#Gui.SendMsgToActiveView("ViewFit") #Centers the camera, but this also zooms it in all the way
+
+# 
+#Gui.Selection.clearSelection()
+# Macro End: C:\Users\Vern\AppData\Roaming\FreeCAD\Macro\Start_Macro_3.FCMacro +++++++++++++++++++++++++++++++++++++++++++++++++

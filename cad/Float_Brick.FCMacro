@@ -1,0 +1,154 @@
+# -*- coding: utf-8 -*-
+
+# Macro Begin: C:\Users\Vern\AppData\Roaming\FreeCAD\Macro\Float_Brick_1.FCMacro +++++++++++++++++++++++++++++++++++++++++++++++++
+import FreeCAD
+import Sketcher
+import PartDesign
+import os
+import ImportGui
+import PartDesignGui
+import Draft
+
+cwd = os.path.basename(__file__)
+file_name = os.path.splitext(__file__)
+
+directory =  __file__.replace(cwd, "")
+file_number = 1
+is_file = True
+
+while(is_file):
+	f = 0
+	try:
+		f = open(file_name[0] + "_" + str(file_number) + ".csv")
+		
+	except IOError:
+		if(file_number == 1):
+			print("Error: No Files Found")
+			is_file = False
+		else:
+			print("Success! " + str(file_number - 1) + " parts made")
+			is_file = False
+		break 
+	lines=f.readlines()
+	c= lines[3].strip().split(",")
+
+	brick_width, brick_length, brick_height, density= c[0:4]
+	FreeCADGui.open(directory + "Start_Macro_3.FCMacro")
+	Gui.SendMsgToActiveView("Run")
+	# Gui.runCommand('Std_DlgMacroRecord',0)
+	# Gui.runCommand('Sketcher_CreateRectangle',0)
+	geoList = []
+	geoList.append(Part.LineSegment(App.Vector(-1.352946,1.609148,0),App.Vector(1.840108,1.609148,0)))
+	geoList.append(Part.LineSegment(App.Vector(1.840108,1.609148,0),App.Vector(1.840108,-1.038689,0)))
+	geoList.append(Part.LineSegment(App.Vector(1.840108,-1.038689,0),App.Vector(-1.352946,-1.038689,0)))
+	geoList.append(Part.LineSegment(App.Vector(-1.352946,-1.038689,0),App.Vector(-1.352946,1.609148,0)))
+	App.getDocument('Unnamed').getObject('Sketch').addGeometry(geoList,False)
+	conList = []
+	conList.append(Sketcher.Constraint('Coincident',0,2,1,1))
+	conList.append(Sketcher.Constraint('Coincident',1,2,2,1))
+	conList.append(Sketcher.Constraint('Coincident',2,2,3,1))
+	conList.append(Sketcher.Constraint('Coincident',3,2,0,1))
+	conList.append(Sketcher.Constraint('Horizontal',0))
+	
+	conList.append(Sketcher.Constraint('Vertical',1))
+	
+	App.getDocument('Unnamed').getObject('Sketch').addConstraint(conList)
+	del geoList, conList
+	
+	App.ActiveDocument.recompute()
+	# Gui.runCommand('Sketcher_ConstrainDistanceX',0)
+	# Gui.Selection.addSelection('Unnamed','Part','Body.Sketch.Edge1',0.931413,1.60915,0)
+	App.getDocument('Unnamed').getObject('Sketch').addConstraint(Sketcher.Constraint('DistanceX',0,1,0,2,3.193054)) 
+	# Gui.Selection.clearSelection()
+	App.getDocument('Unnamed').getObject('Sketch').setDatum(6,App.Units.Quantity(brick_length))
+	App.getDocument('Unnamed').getObject('Sketch').renameConstraint(6, u'brick_length')
+	App.ActiveDocument.recompute()
+	App.ActiveDocument.recompute()
+	# Gui.runCommand('Sketcher_ConstrainDistanceY',0)
+	# Gui.Selection.addSelection('Unnamed','Part','Body.Sketch.Edge4',-1.36304,0.768605,0)
+	App.getDocument('Unnamed').getObject('Sketch').addConstraint(Sketcher.Constraint('DistanceY',3,1,3,2,2.647837)) 
+	# Gui.Selection.clearSelection()
+	App.getDocument('Unnamed').getObject('Sketch').setDatum(7,App.Units.Quantity(brick_height))
+	App.getDocument('Unnamed').getObject('Sketch').renameConstraint(7, u'brick_height')
+	App.ActiveDocument.recompute()
+	App.ActiveDocument.recompute()
+	# Gui.Selection.addSelection('Unnamed','Part','Body.Sketch.Vertex6',-1.35299,-1.03865,0.012,False)
+	# Gui.Selection.addSelection('Unnamed','Part','Body.Sketch.Vertex4',1.84011,-1.03865,0.012,False)
+	# Gui.Selection.addSelection('Unnamed','Part','Body.Sketch.V_Axis',0,-1.25324,0.001,False)
+	### Begin command Sketcher_ConstrainSymmetric
+	App.getDocument('Unnamed').getObject('Sketch').addConstraint(Sketcher.Constraint('Symmetric',2,2,1,2,-2)) 
+	App.ActiveDocument.recompute()
+	### End command Sketcher_ConstrainSymmetric
+	# Gui.Selection.clearSelection()
+	# Gui.Selection.addSelection('Unnamed','Part','Body.Sketch.Vertex1',-1.35299,1.60915,0.012,False)
+	# Gui.Selection.addSelection('Unnamed','Part','Body.Sketch.Vertex6',-1.35299,-1.03865,0.012,False)
+	# Gui.Selection.addSelection('Unnamed','Part','Body.Sketch.H_Axis',-1.48925,0,0.001,False)
+	### Begin command Sketcher_ConstrainSymmetric
+	App.getDocument('Unnamed').getObject('Sketch').addConstraint(Sketcher.Constraint('Symmetric',0,1,2,2,-1)) 
+	App.ActiveDocument.recompute()
+	### End command Sketcher_ConstrainSymmetric
+	# Gui.Selection.clearSelection()
+	App.getDocument('Unnamed').getObject('Sketch').movePoint(2,2,App.Vector(-1.398381,-1.106841,0),0)
+	App.ActiveDocument.recompute()
+	# Gui.getDocument('Unnamed').resetEdit()
+	App.ActiveDocument.recompute()
+	# ActiveSketch = App.getDocument('Unnamed').getObject('Sketch')
+	# tv = ActiveSketch.ViewObject.TempoVis
+	# if tv:
+	#   tv.restore()
+	# ActiveSketch.ViewObject.TempoVis = None
+	# del(tv)
+	# del(ActiveSketch)
+	# 
+	# Gui.Selection.addSelection('Unnamed','Part','Body.Sketch.')
+	App.getDocument('Unnamed').recompute()
+	### Begin command PartDesign_Pad
+	App.getDocument('Unnamed').getObject('Body').newObject('PartDesign::Pad','Pad')
+	App.getDocument('Unnamed').getObject('Pad').Profile = App.getDocument('Unnamed').getObject('Sketch')
+	App.getDocument('Unnamed').getObject('Pad').Length = 10.0
+	App.ActiveDocument.recompute()
+	App.getDocument('Unnamed').getObject('Sketch').Visibility = False
+	App.ActiveDocument.recompute()
+	# App.getDocument('Unnamed').getObject('Pad').ViewObject.ShapeColor=getattr(App.getDocument('Unnamed').getObject('Body').getLinkedObject(True).ViewObject,'ShapeColor',App.getDocument('Unnamed').getObject('Pad').ViewObject.ShapeColor)
+	# App.getDocument('Unnamed').getObject('Pad').ViewObject.LineColor=getattr(App.getDocument('Unnamed').getObject('Body').getLinkedObject(True).ViewObject,'LineColor',App.getDocument('Unnamed').getObject('Pad').ViewObject.LineColor)
+	# App.getDocument('Unnamed').getObject('Pad').ViewObject.PointColor=getattr(App.getDocument('Unnamed').getObject('Body').getLinkedObject(True).ViewObject,'PointColor',App.getDocument('Unnamed').getObject('Pad').ViewObject.PointColor)
+	# App.getDocument('Unnamed').getObject('Pad').ViewObject.Transparency=getattr(App.getDocument('Unnamed').getObject('Body').getLinkedObject(True).ViewObject,'Transparency',App.getDocument('Unnamed').getObject('Pad').ViewObject.Transparency)
+	# App.getDocument('Unnamed').getObject('Pad').ViewObject.DisplayMode=getattr(App.getDocument('Unnamed').getObject('Body').getLinkedObject(True).ViewObject,'DisplayMode',App.getDocument('Unnamed').getObject('Pad').ViewObject.DisplayMode)
+	Gui.getDocument('Unnamed').setEdit(App.getDocument('Unnamed').getObject('Part'),0,'Body.Pad.')
+	# Gui.Selection.clearSelection()
+	### End command PartDesign_Pad
+	# Gui.Selection.clearSelection()
+	App.getDocument('Unnamed').getObject('Sketch').Visibility = False
+	App.getDocument('Unnamed').getObject('Pad').Length = float(brick_width)
+	App.getDocument('Unnamed').getObject('Pad').Length2 = 100.000000
+	App.getDocument('Unnamed').getObject('Pad').UseCustomVector = 0
+	App.getDocument('Unnamed').getObject('Pad').Direction = (1, 1, 1)
+	App.getDocument('Unnamed').getObject('Pad').Type = 0
+	App.getDocument('Unnamed').getObject('Pad').UpToFace = None
+	App.getDocument('Unnamed').getObject('Pad').Reversed = 0
+	App.getDocument('Unnamed').getObject('Pad').Midplane = 1
+	App.getDocument('Unnamed').getObject('Pad').Offset = 0
+	App.getDocument('Unnamed').recompute()
+	Gui.getDocument('Unnamed').resetEdit()
+	
+	c0 = Draft.clone(FreeCAD.ActiveDocument.getObject("Part"))
+	Gui.Selection.addSelection('Unnamed','Clone')
+	
+	FreeCAD.getDocument('Unnamed').getObject('Clone').Scale = (1000.00, 1000.00, 1000.00)
+	App.ActiveDocument.Clone
+	App.getDocument('Unnamed').recompute()
+	Gui.Selection.clearSelection()
+	#Gui.Selection.addSelection('Unnamed','Clone')
+	#
+	##Gui.getDocument('Unnamed').resetEdit()
+	Gui.ActiveDocument.setEdit(App.getDocument('Unnamed').getObject('Clone'))
+	Gui.getDocument('Unnamed').resetEdit()
+	__objs__=[]
+	__objs__.append(FreeCAD.getDocument("Unnamed").getObject("Clone"))
+	
+	ImportGui.export(__objs__,file_name[0] + "_" + str(file_number) +".step")
+	del __objs__
+	file_number += 1
+	App.closeDocument("Unnamed")
+	
+	# Macro End: C:\Users\Vern\AppData\Roaming\FreeCAD\Macro\Float_Brick_1.FCMacro +++++++++++++++++++++++++++++++++++++++++++++++++

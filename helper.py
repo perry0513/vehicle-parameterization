@@ -89,8 +89,8 @@ def gen_stl(length, width, height, noseLength, radius, tailLength, endRadius, na
         subprocess.run(stl_cmd.split(' '), stdout=outfile, stderr=outfile)
     return stl_filename
 
-def gen_designs(sol):
-    path = Path("final")
+def gen_designs(sol, run_name=""):
+    path = Path(f"finals/{run_name}")
     path.mkdir(parents=True, exist_ok=True)
     fairing_name = "fairing"
     payload_name = "OBS_V1_Disp"
@@ -132,8 +132,10 @@ def gen_designs(sol):
         x, y, z = obj['pv']['position']
         f.write(f"{pv_name},0,{pv_name},0,WET,{x},{y},{z},X,0\n")
 
-    cmd = "cp ./cad/* ./final/"
-    os.system(cmd)
+    files = ['Assembly_macro_1.FCMacro', 'OBS_V1_Disp.STEP', 'Float_Brick.FCMacro', 'Start_Macro_3.FCMacro']
+    for filename in files:
+        cmd = f"ln -s ./cad/{filename} ./{str(path / filename)}"
+        os.system(cmd)
 
     print("> Design generated. See 'final/' for related files.")
     
