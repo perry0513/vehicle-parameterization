@@ -1,5 +1,7 @@
+import os
 import json
 import subprocess
+from pathlib import Path
 
 stl_log_filename = '.stl.log'
 
@@ -18,7 +20,7 @@ def parse_json(json_file):
     
     return [l, w, h, n, r, t, e]
 
-def gen_stl(length, width, height, noseLength, radius, tailLength, endRadius):
+def gen_stl(length, width, height, noseLength, radius, tailLength, endRadius, name=None):
     # Generate boxfish stl file
     data = {
             "type": "root",
@@ -79,10 +81,59 @@ def gen_stl(length, width, height, noseLength, radius, tailLength, endRadius):
             }
 
     # stl_filename = f'{stl_dir}/boxfish_{length}_{width}_{height}_{noseLength}_{radius}_{tailLength}_{endRadius}.stl'
-    stl_filename = 'tmp.stl'
+    stl_filename = 'tmp.stl' if name is None else name
     json_str = json.dumps(data, separators=(',',':'))
     stl_cmd = f"npx jscad jscad-generator.js -o {stl_filename} --jsonComponentModel {json_str}"
     # print(f'Execute command: {stl_cmd}')
     with open(stl_log_filename, 'w') as outfile:
         subprocess.run(stl_cmd.split(' '), stdout=outfile, stderr=outfile)
     return stl_filename
+
+def gen_designs(sol):
+    path = Path("final")
+    path.mkdir(parents=True, exist_ok=True)
+    fairing_name = "fairing"
+    payload_name = "OBS_V1_Disp"
+    pv_name = "Float_Brick_1"
+
+    gen_stl(*(sol.params), str(path / f"{fairing_name}.stl"))
+
+    v_length = sol.params[0] / 1e3
+    v_width = sol.params[1] / 1e3
+    v_height = sol.params[2] / 1e3
+
+    obj = {}
+    for item in sol.pack.packer.bins[0].items:
+        name = item.name
+        position = [float(pos) / 1e3 for pos in item.position]
+        rotation = item.rotation_type
+        dimension = [float(dim) / 1e3 for dim in item.get_dimension()]
+        obj[name] = {
+                'position': position,
+                'rotation': rotation,
+                'dimension': dimension,
+                }
+
+    with open(str(path / f"{pv_name}.csv"), 'w') as f:
+        f.write('"Float Brick,  Definition Sheet",,,\n')
+        f.write("Material - Syntactic Foam (4000 meter rating),,,\n")
+        f.write("brick_width (m),brick_length (m),brick_height  (m),Density of Material (kg/m^3)\n")
+        l, w, h = obj['pv']['dimension']
+        f.write(f"{l},{w},{h},{0}\n")
+
+    with open(str(path / 'Vehicle_Def.csv'), 'w') as f:
+        f.write("Vehicle Definition File,,,,,,,,,\n")
+        f.write("Water Density (kg/m^3),1027,,,,Module Position,,,,\n")
+        f.write('Module File (.STEP),Module Density (kg/m^3),Module_Disp file (.STEP),Module_Disp Density (kg/m^3),"Module Type (WET, DRY or PV)",X (m),Y (m),Z (m),"Axis of Rotation (X, Y, Z)",Rotation Angle (Deg.)\n')
+
+        f.write(f"{fairing_name},0,{fairing_name},0,WET,0,0,0,X,0\n")
+        x, y, z = obj['payload']['position']
+        f.write(f"{payload_name},0,{payload_name},0,WET,{x},{y},{z},X,0\n")
+        x, y, z = obj['pv']['position']
+        f.write(f"{pv_name},0,{pv_name},0,WET,{x},{y},{z},X,0\n")
+
+    cmd = "cp ./cad/* ./final/"
+    os.system(cmd)
+
+    print("> Design generated. See 'final/' for related files.")
+    

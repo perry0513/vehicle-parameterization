@@ -35,6 +35,7 @@ class packing_problem:
         self.feasible = False
         self.loss = float("inf")
         self.net_in_water_weight = None
+        self.packer = None
 
 
     def pack(self):
@@ -57,6 +58,7 @@ class packing_problem:
         PV_width = bat_width + 2 * PV_thickness # m
         PV_height = bat_height + 2 * PV_thickness # m
         PV_disp_vol = PV_length * PV_width * PV_height # m^3
+
         PV_vol = PV_disp_vol - bat_vol # m^3
         PV_mass = PV_vol * PV_density # kg
         PV_buoyancy = PV_disp_vol * water_density # kg
@@ -84,6 +86,7 @@ class packing_problem:
         packer.add_item(Item("payload", payload_x, payload_y, payload_z, 0)) # not using weight for packing
         packer.add_bin(Bin('main-cabin', self.sol.params[0], self.sol.params[1], self.sol.params[2], 10))
         packing_loss = self._pack(packer) # vol needed
+        self.packer = packer
         # self.loss = math.exp(math.log10(total_in_water_weight) * packingloss) + total_in_water_weight
         # TODO: need normalizing
         # print(packing_loss * 1e-9, (float_vol - spare_vol) * 1e-9)
