@@ -44,7 +44,7 @@ class Solution:
 
 
 class SimulatedAnnealing:
-    def __init__(self, sol, n_iter, json_name, sched_method='classic', normalization="none"):
+    def __init__(self, sol, n_iter, json_name, sched_method='classic', normalization="none", suffix=None):
         self.normalization = normalization
         self.json_name = json_name
         self.n_iter = n_iter
@@ -66,6 +66,8 @@ class SimulatedAnnealing:
         self.conv_cnt = 0
         self.sched_method = sched_method
         self.log = []
+        self.run_name = f"{self.json_name}_{self.sched_method}_scheduling_{self.normalization}_normalization_{self.n_iter}_iters"
+        if suffix is not None: self.run_name += f"_{suffix}"
 
     def run(self):
         self._init()
@@ -428,18 +430,18 @@ class SimulatedAnnealing:
 
     def write(self):
         Path("logs").mkdir(parents=True, exist_ok=True)
-        with open(f"logs/{self.json_name}_{self.sched_method}_scheduling_{self.normalization}_normalization_{self.n_iter}_iters_log.csv", 'w') as log_file:
+        with open(f"logs/{self.run_name}_log.csv", 'w') as log_file:
             output = csv.writer(log_file) # TODO add cost normalization method
             output.writerow(["temp", "success_rate", "svg_accept_p", "avg_delta_cost", "cost", "raw_cost","true_cost","raw_true_cost", "valid", "drag_force"])
             for line in self.log:
                 output.writerow(line)
-        with open(f"logs/{self.json_name}_{self.sched_method}_scheduling_{self.normalization}_normalization_{self.n_iter}_iters_results.csv", 'w') as results_file:
+        with open(f"logs/{self.run_name}_results.csv", 'w') as results_file:
             output = csv.writer(results_file) # TODO add cost normalization method
             output.writerow(["length", "width", "height", "noseLength", "radius", "tailLength", "endRadius"])
             output.writerow(self.best_valid_sol.params)
 
     def visualize(self, sol):
-        gen_designs(sol)
+        gen_designs(sol, self.run_name)
 
 
 
@@ -454,7 +456,7 @@ def main(args):
     params = parse_json(FLAGS.json)
     sol = Solution(params)
     niters = 200
-    sa = SimulatedAnnealing(sol, niters, FLAGS.json, FLAGS.sched, FLAGS.norm)
+    sa = SimulatedAnnealing(sol, niters, FLAGS.json, FLAGS.sched, FLAGS.norm, FLAGS.suffix)
     best_valid_sol = sa.run()
     if FLAGS.log:
         sa.write()
@@ -478,4 +480,7 @@ if __name__ == '__main__':
             )
     flags.DEFINE_boolean("log", False, "Write out log and assignment")
     flags.DEFINE_boolean("visual", False, "Create files for visualization")
+    flags.DEFINE_string('suffix', None, 'Suffix added to output files')
+
+    flags.mark_flag_as_required('json')
     app.run(main)

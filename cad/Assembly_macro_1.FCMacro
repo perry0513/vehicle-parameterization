@@ -1,0 +1,190 @@
+# Assembly Macro Eli Paul
+
+#Gets directory of file
+import ImportGui
+import os
+cwd = os.path.basename(__file__)
+directory =  __file__.replace(cwd, '')
+
+#FreeCADGui.open(directory + "FCInfo.FCMacro")
+#Gui.SendMsgToActiveView("Run")
+
+#Opens Csv File and reads it
+f=open(directory + "Vehicle_Def.csv")
+lines=f.readlines()
+coords=[]
+
+# Creates new File
+App.newDocument("File_Name")
+Gui.activateWorkbench("Assembly4Workbench")
+Gui.runCommand("Asm4_makeAssembly", 0)
+density = []
+volume = []
+cm = []
+total_mass = []
+count = 1
+# object_name = 'Solid'
+for i in lines[3:]:
+	c= i.strip().split(",")
+	coords.append([c])
+	file = directory + c[0] + ".step"
+	if not os.path.isfile(file):
+		file = directory + c[0] + ".STEP"
+	if not os.path.isfile(file):
+		file = directory + c[0] + ".stl"
+	ImportGui.insert(file,"Unnamed")
+	print(directory + c[0] + ".step")
+	density.append(c[1])
+	#Moves current document to Assembly
+	# object_name = 'Shell' if App.getDocument("Unnamed").getObject('Solid') == None else 'Solid'
+	object_name = App.getDocument("Unnamed").Objects[-1].Name
+	App.getDocument('File_Name').moveObject(App.getDocument("Unnamed").getObject(object_name), True)
+	object_name = App.getDocument('File_Name').Objects[-1].Name
+	#Gets X,Y,Z positions from CSV file
+	x, y, z = [c[j] for j in (5, 6, 7)]
+	x =float(x) * 1000
+	y = float(y) * 1000
+	z = float(z) * 1000
+	#Gets Rotation Axis and Angle from CSV file
+	x_rotation = y_rotation = z_rotation = 0
+	angle = float(c[9])
+	if(c[8] == 'X' or c[8] == 'x'):
+		x_rotation = 1
+	elif(c[8] == 'Y' or c[8] == 'y' ):
+		y_rotation = 1
+	elif(c[8] == 'Z' or c[8] == 'z'):
+		z_rotation = 1
+	else:
+		x_rotation = 1
+		angle = 0
+	# If the part needs to be moved, places at correct coordinates
+	if(x !=0 or y != 0 or z != 0):
+		# part_feature = f"{object_name}00" + str(count)
+		part_feature = object_name
+		FreeCAD.getDocument('File_Name').getObject(part_feature).Placement = App.Placement(App.Vector(x,y,z),App.Rotation(App.Vector(x_rotation, y_rotation, z_rotation), angle))
+		count += 1
+	# Closes Part document
+	App.closeDocument("Unnamed")
+#Saves file
+App.getDocument("File_Name").saveAs(directory + "File_Name.FCStd")
+volume.append((App.getDocument("File_Name").getObject(object_name).Shape.Volume) / 1000000000)
+cm.append(App.getDocument("File_Name").getObject(object_name).Shape.CenterOfMass)
+total_mass.append(volume[0] * float(density[0]))
+for i in range(count-1):
+	# part_feature_string = str(float(i+1) / 100)
+	# part_feature_string = part_feature_string.replace('.','')
+	part_feature_string = ''
+	volume.append((App.getDocument("File_Name").getObject(object_name + part_feature_string).Shape.Volume) / 1000000000)
+	cm.append(App.getDocument("File_Name").getObject(object_name + part_feature_string).Shape.CenterOfMass)
+	total_mass.append(volume[i+1] * float(density[i+1]))
+
+cm_x = []
+cm_y = []
+cm_z = []
+
+for i in range(len(total_mass)):
+	cm_x.append(total_mass[i] * cm[i][0]/1000)
+	cm_y.append(total_mass[i] * cm[i][1]/1000)
+	cm_z.append(total_mass[i] * cm[i][2]/1000)
+cm_x_total = sum(cm_x) / sum(total_mass)
+cm_y_total = sum(cm_y) / sum(total_mass)
+cm_z_total = sum(cm_z) / sum(total_mass)
+print('Center of Gravity x: ' + str(round(cm_x_total, 5)) + ' (m)')
+print('Center of Gravity y: ' + str(round(cm_y_total, 5)) + ' (m)')
+print('Center of Gravity z: ' + str(round(cm_z_total, 5)) + ' (m)')
+
+print('Total Mass of Vehicle: ' + str(round(sum(total_mass), 5)) + ' (kg)')
+Gui.SendMsgToActiveView("ViewFit")
+###################################################################
+#
+# Creates new File for Displacement files
+App.newDocument("File_Name_DISP")
+Gui.activateWorkbench("Assembly4Workbench")
+Gui.runCommand("Asm4_makeAssembly", 0)
+#
+density_disp = []
+volume_disp = []
+cdm = []
+total_disp_mass = []
+count = 1
+for i in lines[3:]:
+	c= i.strip().split(",")
+	coords.append([c])
+	file = directory + c[2] + ".step"
+	if not os.path.isfile(file):
+		file = directory + c[2] + ".STEP"
+	ImportGui.insert(file,"Unnamed")
+	density_disp.append(c[3])
+	#Moves current document to Assembly
+	# object_name = 'Shell' if App.getDocument("Unnamed").getObject('Solid') == None else 'Solid'
+	object_name = App.getDocument("Unnamed").Objects[-1].Name
+	App.getDocument('File_Name_DISP').moveObject(App.getDocument("Unnamed").getObject(object_name), True)
+	object_name = App.getDocument('File_Name_DISP').Objects[-1].Name
+	#Gets X,Y,Z positions from CSV file
+	x, y, z = [c[j] for j in (5, 6, 7)]
+	x = float(x) * 1000
+	y = float(y) * 1000
+	z = float(z) * 1000
+	#Gets Axis fo ratation and rotation angle
+	x_rotation = y_rotation = z_rotation = 0
+	angle = float(c[9])
+	if(c[8] == 'X' or c[8] == 'x'):
+		x_rotation = 1
+	elif(c[8] == 'Y' or c[8] == 'y' ):
+		y_rotation = 1
+	elif(c[8] == 'Z' or c[8] == 'z'):
+		z_rotation = 1
+	else:
+		x_rotation = 1
+		angle = 0
+	# If the part needs to be moved, places at correct coordinates
+	if(x !=0 or y != 0 or z != 0):
+		# part_feature_string = str(float(count) / 100)
+		# part_feature_string = part_feature_string.replace('.','')
+		part_feature_string = ''
+		part_feature = object_name + part_feature_string
+		FreeCAD.getDocument('File_Name_DISP').getObject(part_feature).Placement = App.Placement(App.Vector(x,y,z),App.Rotation(App.Vector(x_rotation, y_rotation, z_rotation), angle))
+		count += 1
+	# Closes Part document
+	App.closeDocument("Unnamed")
+#Saves file
+App.getDocument("File_Name_DISP").saveAs(directory + "File_Name_DISP.FCStd")
+
+volume_disp.append((App.getDocument("File_Name_DISP").getObject(object_name).Shape.Volume) / 1000000000)
+cdm.append(App.getDocument("File_Name_DISP").getObject(object_name).Shape.CenterOfMass)
+total_disp_mass.append(volume_disp[0] * float(density_disp[0]))
+for i in range(count-1):
+	# part_feature_string = str(float(i+1) / 100)
+	# part_feature_string = part_feature_string.replace('.','')
+	part_feature_string = ''
+	volume_disp.append((App.getDocument("File_Name_DISP").getObject(object_name + part_feature_string).Shape.Volume) / 1000000000)
+	cdm.append(App.getDocument("File_Name_DISP").getObject(object_name + part_feature_string).Shape.CenterOfMass)
+	total_disp_mass.append(volume_disp[i+1] * float(density_disp[i+1]))
+
+cdm_x = []
+cdm_y = []
+cdm_z = []
+total_volume = (sum(volume_disp))
+for i in range(len(total_disp_mass)):
+	cdm_x.append(total_disp_mass[i] * (cm[i][0]/1000))
+	cdm_y.append(total_disp_mass[i] * (cm[i][1]/1000))
+	cdm_z.append(total_disp_mass[i] * (cm[i][2]/1000))
+cdm_x_total = sum(cdm_x) / sum(total_disp_mass)
+cdm_y_total = sum(cdm_y) / sum(total_disp_mass)
+cdm_z_total = sum(cdm_z) / sum(total_disp_mass)
+#cg of each part * distance of reference
+
+#print(str(App.activeDocument.Shape.CenterOfMass))
+print('Center of bouyancy x: ' + str(round(cdm_x_total, 5)) + ' (m)')
+print('Center of bouyancy y: ' + str(round(cdm_y_total, 5)) + ' (m)')
+print('Center of bouyancy z: ' + str(round(cdm_z_total, 5)) + ' (m)')
+
+print('Total bouyancy of Vehicle: ' + str(round(sum(total_disp_mass), 5)) + ' (kg)')
+
+print( 'In Water Weight: ' + str(round((sum(total_mass) - sum(total_disp_mass)), 5)) + '(kg)')
+
+Gui.SendMsgToActiveView("ViewFit")
+#Closes spreedsheet file
+f.close()
+
+
