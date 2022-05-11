@@ -439,7 +439,7 @@ class SimulatedAnnealing:
             output.writerow(self.best_valid_sol.params)
 
     def visualize(self, sol):
-        gen_design(sol)
+        gen_designs(sol)
 
 
 
