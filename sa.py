@@ -140,7 +140,7 @@ class SimulatedAnnealing:
             success_rate /= self.inner_iter
 
             self._restore_best()
-            self.log.append([self.t, success_rate, self.avg_accept_p, self.avg_delta_cost, self.sol.cost,self.sol.raw_cost, self.sol.true_cost, self.sol.raw_true_cost, self.sol.valid, self.sol.df])
+            self.log.append([self.t, success_rate, self.avg_accept_p, self.avg_delta_cost, self.sol.cost,self.sol.raw_cost, self.sol.true_cost, self.sol.raw_true_cost, self.best_valid_sol.cost,self.best_valid_sol.raw_cost, self.sol.valid, self.sol.df])
             if i % 1 == 0:
                 print(f'---- Iter {i} ----')
                 print(f'> temperature   : {self.t}')
@@ -432,7 +432,7 @@ class SimulatedAnnealing:
         Path("logs").mkdir(parents=True, exist_ok=True)
         with open(f"logs/{self.run_name}_log.csv", 'w') as log_file:
             output = csv.writer(log_file) # TODO add cost normalization method
-            output.writerow(["temp", "success_rate", "svg_accept_p", "avg_delta_cost", "cost", "raw_cost","true_cost","raw_true_cost", "valid", "drag_force"])
+            output.writerow(["t", "success_rate", "avg_accept_p", "avg_delta_cost", "sol_cost","sol_raw_cost", "sol_true_cost", "sol_raw_true_cost", "best_valid_sol_cost","best_valid_sol_raw_cost", "sol_valid", "sol_df"])
             for line in self.log:
                 output.writerow(line)
         with open(f"logs/{self.run_name}_results.csv", 'w') as results_file:
@@ -455,7 +455,7 @@ def main(args):
     #     args = [int(arg) for arg in sys.argv[1:]]
     params = parse_json(FLAGS.json)
     sol = Solution(params)
-    niters = 200
+    niters = 2
     sa = SimulatedAnnealing(sol, niters, FLAGS.json, FLAGS.sched, FLAGS.norm, FLAGS.suffix)
     best_valid_sol = sa.run()
     if FLAGS.log:
