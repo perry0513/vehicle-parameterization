@@ -1,19 +1,36 @@
+norm_names = "none best_valid rolling_avg"
+sched_names = "classic timberwolf fast"
+do for [i=1:words(norm_names)] {
+files = "logs/test.json_classic_scheduling_".word(norm_names, i)."_normalization_200_iters_1_log.csv logs/test.json_timberwolf_scheduling_".word(norm_names, i)."_normalization_200_iters_1_log.csv logs/test.json_fast_scheduling_".word(norm_names, i)."_normalization_200_iters_1_log.csv"
+
+
 set datafile separator ','
 set ytics nomirror
-set y2tics
 set terminal png size 800,700;
-set output "cost_scheduling.png"
+set output "figs/all_cost_scheduling_norm_".word(norm_names, i).".png"
 
 set autoscale  y
-set autoscale y2
-set ylabel "Raw Cost"
-set y2label "Temperature"
+set ylabel "Raw Cost (Best Valid)"
 set key autotitle columnhead
 set title "Raw cost over Iterations by Scheduling"
 
-classic = "logs/test.json_classic_scheduling_none_normalization_200_iters_1_log.csv"
-timberwolf = "logs/test.json_timberwolf_scheduling_none_normalization_200_iters_1_log.csv"
-fast = "logs/test.json_fast_scheduling_none_normalization_200_iters_1_log.csv"
+plot word(files,1) using 10 axis x1y1 title word(sched_names,1)." raw cost" w lines, word(files, 2) using 10 axis x1y1 w lines title word(sched_names, 2)."raw cost", word(files, 3) using 10 axis x1y1 w lines title word(sched_names, 3)." raw cost"
 
-plot classic using 6 axis x1y1 title "classic raw cost" w lines, timberwolf using 6 axis x1y1 w lines title "timberwolf raw cost", fast using 6 axis x1y1 w lines title "fast raw cost",\
-classic using 1 axis x1y2 title "classic temp" w lines, timberwolf using 1 axis x1y2 w lines title "timberwolf temp", fast using 1 axis x1y2 w lines title "fast temp"
+
+do for [t=1:words(files)] {
+
+set terminal png size 800,700;
+set output "figs/".word(sched_names,t)."_cost_temp_scheduling_".word(norm_names,i)."_normalization.png"
+
+set autoscale  y
+set autoscale y2
+set ylabel "Raw Cost (Best Valid)"
+set y2label "Temperature"
+set key autotitle columnhead
+set title "Raw cost and Temperature over Iterations (".word(sched_names,t)." scheduling, ".word(norm_names,i)." normalization)"
+
+plot word(files,t) using 10 axis x1y1 title "raw cost" w lines, \
+word(files,t) using 1 axis x1y2 title "temp" w lines
+
+}
+}
