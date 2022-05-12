@@ -81,10 +81,12 @@ def gen_stl(length, width, height, noseLength, radius, tailLength, endRadius, na
             }
 
     # stl_filename = f'{stl_dir}/boxfish_{length}_{width}_{height}_{noseLength}_{radius}_{tailLength}_{endRadius}.stl'
-    stl_filename = 'tmp.stl' if name is None else name
+    if name is None: name = 'tmp'
+    stl_filename = f'{name}.stl'
     json_str = json.dumps(data, separators=(',',':'))
+    with open(f'{name}.json', 'w') as f:
+        f.write(json_str)
     stl_cmd = f"npx jscad jscad-generator.js -o {stl_filename} --jsonComponentModel {json_str}"
-    # print(f'Execute command: {stl_cmd}')
     with open(stl_log_filename, 'w') as outfile:
         subprocess.run(stl_cmd.split(' '), stdout=outfile, stderr=outfile)
     return stl_filename
@@ -96,7 +98,7 @@ def gen_designs(sol, run_name=""):
     payload_name = "OBS_V1_Disp"
     pv_name = "Float_Brick_1"
 
-    gen_stl(*(sol.params), str(path / f"{fairing_name}.stl"))
+    gen_stl(*(sol.params), str(path / fairing_name))
 
     v_length = sol.params[0] / 1e3
     v_width = sol.params[1] / 1e3
