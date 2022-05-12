@@ -46,7 +46,7 @@ class Solution:
 class SimulatedAnnealing:
     def __init__(self, sol, n_iter, json_name, sched_method='classic', normalization="none", suffix=None):
         self.normalization = normalization
-        self.json_name = json_name
+        self.json_name = json_name.split('/')[-1]
         self.n_iter = n_iter
         self.inner_iter = 5
         self.sol = sol
@@ -62,7 +62,7 @@ class SimulatedAnnealing:
         self.rand_n = 10
         self.t = None
         self.T1 = None
-        self.conv_accept_p = 0.03
+        self.conv_accept_p = 0.02
         self.conv_cnt = 0
         self.sched_method = sched_method
         self.log = []
@@ -395,7 +395,7 @@ class SimulatedAnnealing:
         self.avg_buoy_cost = (self.avg_buoy_cost * (self.rand_n-1) + buoy_cost) / self.rand_n
         self.avg_df_cost = (self.avg_df_cost * (self.rand_n-1) + df_cost) / self.rand_n
         self.avg_vol_cost = (self.avg_vol_cost * (self.rand_n-1) + vol_cost) / self.rand_n
-        print(self.avg_pack_cost, self.avg_buoy_cost, self.avg_df_cost, self.avg_vol_cost)
+        # print(self.avg_pack_cost, self.avg_buoy_cost, self.avg_df_cost, self.avg_vol_cost)
 
 
     def _get_temperature(self, it, scheduling_method='classic'):
