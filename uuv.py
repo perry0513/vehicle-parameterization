@@ -40,7 +40,12 @@ class packing_problem:
 
     def pack(self):
         params = self.sol.params
-        length = params[0] * 1e-3 # m
+        radius = params[4]
+        # length = params[0] * 1e-3 # m
+        length = (params[0] - math.ceil(2 - math.sqrt(2)) * radius) * 1e-3
+        width  = (params[1] - math.ceil(2 - math.sqrt(2)) * radius) * 1e-3
+        height = (params[2] - math.ceil(2 - math.sqrt(2)) * radius) * 1e-3
+        print(int(length * 1e3), int(width * 1e3), int(height * 1e3))
         vehicle_vol = params[0] * params[1] * params[2] * 1e-9 # m^3
         _fairing_area = self.sol.area
         _fairing_vol = self.sol.vol
@@ -83,8 +88,10 @@ class packing_problem:
         # check whether PV and payload can fit in vehicle
         packer = Packer()
         packer.add_item(Item("pv", PV_length * 1e3, PV_width * 1e3, PV_height * 1e3, 0)) # not using weight for packing
+        print(int(PV_length * 1e3), int(PV_width * 1e3), int(PV_height * 1e3))
         packer.add_item(Item("payload", payload_x, payload_y, payload_z, 0)) # not using weight for packing
-        packer.add_bin(Bin('main-cabin', self.sol.params[0], self.sol.params[1], self.sol.params[2], 10))
+        # packer.add_bin(Bin('main-cabin', self.sol.params[0], self.sol.params[1], self.sol.params[2], 10))
+        packer.add_bin(Bin('main-cabin', length * 1e3, width * 1e3, height * 1e3, 10))
         packing_loss = self._pack(packer) # vol needed
         self.packer = packer
         # self.loss = math.exp(math.log10(total_in_water_weight) * packingloss) + total_in_water_weight

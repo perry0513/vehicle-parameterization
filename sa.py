@@ -25,6 +25,13 @@ ranges = [
         {'min':1000, 'max':4000},
         {'min':10, 'max':100},
         ]
+
+reasons = {
+        1: 'unable to pack',
+        2: 'cannot float',
+        3: 'df too large',
+        }
+
 class Solution:
     def __init__(self, params):
         self.params = params
@@ -48,7 +55,7 @@ class SimulatedAnnealing:
         self.normalization = normalization
         self.json_name = json_name.split('/')[-1]
         self.n_iter = n_iter
-        self.inner_iter = 5
+        self.inner_iter = 10
         self.sol = sol
         self.prev_sol = None
         self.best_sol = None
@@ -82,14 +89,17 @@ class SimulatedAnnealing:
             self.avg_accept_p = 0
             success_rate = 0
             pvalid = False
+            reason = None
             for j in range(self.inner_iter):
                 if pvalid and not valid and random.random() < 1 - accept_p : # change the thing that made it fail with probability 1- accept_p, we want to force valid closer to end of SA
-                    perturbed_idx = self._perturb(it=i, idx=perturbed_idx)
+                    perturbed_idx = self._perturb(it=i, idx=perturbed_idx, reason=reason)
                 else:
-                    perturbed_idx = self._perturb(it=i)
+                    perturbed_idx = self._perturb(it=i, reason=reason)
 
                 cost, true_cost, raw_cost, raw_true_cost = self._compute_cost()
-                valid = self._is_valid()
+                valid, reason = self._is_valid()
+                if reason is not None:
+                    print(reasons[reason])
                 delta_cost = (self.sol.cost - self.prev_sol.cost) * 5
                 accept_p = min(1.0, math.exp(-delta_cost / self.t)) if delta_cost != 0 else 0
                 # print(delta_cost, accept_p)
@@ -140,7 +150,7 @@ class SimulatedAnnealing:
             success_rate /= self.inner_iter
 
             self._restore_best()
-            self.log.append([self.t, success_rate, self.avg_accept_p, self.avg_delta_cost, self.sol.cost,self.sol.raw_cost, self.sol.true_cost, self.sol.raw_true_cost, self.best_valid_sol.cost,self.best_valid_sol.raw_cost, self.sol.valid, self.sol.df])
+            self.log.append([self.t, success_rate, self.avg_accept_p, self.avg_delta_cost, self.sol.cost,self.sol.raw_cost, self.sol.true_cost, self.sol.raw_true_cost, self.best_valid_sol.cost if self.best_valid_sol is not None else None, self.best_valid_sol.raw_cost if self.best_valid_sol is not None else None, self.sol.valid, self.sol.df])
             if i % 1 == 0:
                 print(f'---- Iter {i} ----')
                 print(f'> temperature   : {self.t}')
@@ -189,7 +199,7 @@ class SimulatedAnnealing:
             self.sol.area = area
 
             self.sol.pack = packing_problem(self.sol)
-            valid = self._is_valid()
+            valid, reason = self._is_valid()
 
             pack_cost = self._pack_cost()
             buoy_cost = self._buoy_cost()
@@ -242,14 +252,28 @@ class SimulatedAnnealing:
         # self._keep_best()
         print('Init done')
 
-    def _perturb(self, it, idx=-1):
+    def _perturb(self, it, idx=-1, reason=None):
         lb = max(0.08 - 0.001 * it, 0.04)
         ub = max(0.12 - 0.001 * it, 0.08)
         increase_prob = max(0.4 - 0.005 * it, 0.15)
 
+        if reason == 1:
+            r = np.argmin(self.sol.params[:3])
+            increase_prob = 0.8
+            lb *= 1.5
+            ub *= 1.5
+        elif reason == 2:
+            r = random.randint(3, 6)
+            increase_prob = 0.6
+            lb *= 1.5
+            ub *= 1.5
+        elif reason == 3:
+            r = random.randint(0, len(ranges)- 1) # lol randint is inclusive on end idx for some reason
+            pass # don't know what to do
+
         # TODO: perturb different dimensions based on failure from last solution?
-        if idx != -1 and random.random() < 0.8:
-            r = idx
+        # if idx != -1 and random.random() < 0.8:
+        #     r = idx
         elif random.random() < 0.2:
             r = np.argmax(self.sol.params)
             increase_prob = 0.2
@@ -283,7 +307,7 @@ class SimulatedAnnealing:
         if not buoy_valid: pass
         if not df_valid: pass
         self.sol.valid = pack_valid and buoy_valid and df_valid
-        return self.sol.valid
+        return self.sol.valid, 1 if not pack_valid else 2 if not buoy_valid else 3 if not df_valid else None
 
     def _pack_cost(self): # TODO this should be normalized / more dynamic
         if not self.sol.pack.evaluated:
@@ -455,7 +479,7 @@ def main(args):
     #     args = [int(arg) for arg in sys.argv[1:]]
     params = parse_json(FLAGS.json)
     sol = Solution(params)
-    niters = 2
+    niters = 200
     sa = SimulatedAnnealing(sol, niters, FLAGS.json, FLAGS.sched, FLAGS.norm, FLAGS.suffix)
     best_valid_sol = sa.run()
     if FLAGS.log:

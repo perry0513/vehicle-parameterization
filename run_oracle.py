@@ -42,13 +42,17 @@ def parse_drag():
 
 def parse_volume():
     with open(stl_log_filename, 'r') as f:
-        line = f.readlines()[-1]
-        return json.loads(line)['volume']
+        lines = f.readlines()
+        for line in list(reversed(lines)):
+            if 'area' in line and 'volume' in line:
+                return json.loads(line)['volume']
 
 def parse_area():
     with open(stl_log_filename, 'r') as f:
-        line = f.readlines()[-1]
-        return json.loads(line)['area']
+        lines = f.readlines()
+        for line in list(reversed(lines)):
+            if 'area' in line and 'volume' in line:
+                return json.loads(line)['area']
 
 if __name__ == '__main__':
     run_cfd = sys.argv[1] == 'cfd'

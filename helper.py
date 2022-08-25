@@ -135,9 +135,11 @@ def gen_designs(sol, run_name=""):
         f.write(f"{pv_name},0,{pv_name},0,WET,{x},{y},{z},X,0\n")
 
     files = ['Assembly_macro_1.FCMacro', 'OBS_V1_Disp.STEP', 'Float_Brick.FCMacro', 'Start_Macro_3.FCMacro']
-    for filename in files:
-        cmd = f"ln -s ./cad/{filename} ./{str(path / filename)}"
-        os.system(cmd)
+    # for filename in files:
+    #     cmd = f"ln -s ./cad/{filename} ./{str(path / filename)}"
+    #     os.system(cmd)
+    cmd = f"cp -r ./cad/ ./{str(path)}"
+    os.system(cmd)
 
     print(f"> Design generated. See {str(path)} for related files.")
     
